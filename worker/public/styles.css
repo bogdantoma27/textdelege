@@ -291,6 +291,7 @@ select.field{appearance:none;width:auto;max-width:100%;min-width:11.5em;padding-
 .checkboxes{margin:0}
 .checkbox{position:relative;display:flex;min-height:44px;padding-left:32px}
 .checkbox input{position:absolute;z-index:1;top:0;left:0;width:44px;height:44px;margin:0;opacity:0;cursor:pointer}
+.checkbox,.checkbox input,.checkbox label{-webkit-tap-highlight-color:transparent}
 .checkbox label{display:inline-block;padding:8px 0 8px 4px;font-size:var(--s);cursor:pointer;touch-action:manipulation}
 .checkbox label::before{content:"";position:absolute;top:12px;left:0;width:20px;height:20px;border:1px solid var(--border-strong);border-radius:4px;background:var(--paper)}
 .checkbox label::after{content:"";position:absolute;top:15px;left:6px;width:6px;height:10px;border:solid var(--on-brand);border-width:0 2px 2px 0;transform:rotate(45deg);opacity:0}
@@ -443,8 +444,9 @@ ins{background:var(--diff-ins-bg);color:var(--diff-ins);text-decoration:underlin
 
 .time .label{display:inline;margin:0;font-size:var(--xs);color:var(--secondary)}
 .time .hint{flex:1 0 100%;order:1;margin:0}
-.time .date-row{min-width:0;align-items:center}
+.time .date-row{flex-wrap:nowrap;min-width:0;align-items:center}
 .time .date-row select.field{flex:0 1 auto;min-width:0}
+.time .date-row .btn{flex:none}
 .compare-links{display:flex;flex-wrap:wrap;gap:4px 24px;margin:12px 0 0;font-size:var(--xs);line-height:var(--xs-lh)}
 .src{overflow:clip;overflow-clip-margin:4px;margin:24px 0 32px;padding-top:16px;border-top:1px solid var(--border);font-size:calc(14px*var(--k));line-height:20px;color:var(--muted)}
 .src p{display:flex;flex-wrap:wrap;row-gap:4px;margin:0 0 0 -14px}
@@ -713,8 +715,9 @@ mark{background:var(--accent-tint);color:var(--text);padding:0 1px}
   .summary-key{margin-bottom:4px}
   .tabs-panel{padding-top:16px}
   .wide-only{display:none}
-  .pagination{flex-direction:column}
-  .pagination-prev+.pagination-next,.pagination-next:first-child{margin-left:0;padding-left:0;border-top:1px solid var(--border);border-left:0;text-align:left}
+  .pagination-prev:has(+.pagination-next){padding-right:12px}
+  .pagination-prev+.pagination-next{padding-left:12px}
+  .pagination-label{font-size:calc(16px*var(--k));line-height:24px;overflow-wrap:anywhere}
   .data.stack,.data.stack tbody{display:block}
   .data.stack thead{position:absolute;top:0;left:0;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
   .data.stack tr{display:block;padding:12px 0;border-bottom:1px solid var(--border)}
@@ -769,7 +772,9 @@ mark{background:var(--accent-tint);color:var(--text);padding:0 1px}
   .options.inline .checkbox label{padding:12px 0 12px 4px}
   .options.inline .checkbox label::before{top:12px}
   .options.inline .checkbox label::after{top:15px}
-  .nav a,.crumbs a,.compare-links a,.status a,.footer-col a,.to-top,.to-bottom,.tabs-item a{display:inline-flex;align-items:center;min-height:44px}
+  .nav a,.crumbs a,.compare-links a,.footer-col a,.to-top,.to-bottom,.tabs-item a{display:inline-flex;align-items:center;min-height:44px}
+  .status{row-gap:0}
+  .status>*{padding:12px 0;line-height:20px}
   .nav a{flex-direction:column;align-items:flex-start;justify-content:center}
   .tabs-item a{display:grid;align-content:center}
   .toc-list>a{align-content:center;min-height:44px}

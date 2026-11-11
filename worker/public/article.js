@@ -265,9 +265,27 @@ document.addEventListener("click", (event) => {
     pick(new URL(link.href));
   } else if (inPlace(link)) {
     event.preventDefault();
-    visit(link.href, { push: true }).then(arrive);
+    const strip = link.closest(".tabs-list");
+    if (strip === null) {
+      visit(link.href, { push: true }).then(arrive);
+      return;
+    }
+    const top = strip.getBoundingClientRect().top;
+    visit(link.href, { push: true }).then(() => {
+      const next = document.querySelector("#page .tabs-list");
+      if (next === null) return arrive();
+      scrollBy(0, next.getBoundingClientRect().top - top);
+      next.querySelector("a[aria-current]")?.focus({ preventScroll: true });
+      prefetchTabs();
+    });
   }
 });
+
+function prefetchTabs() {
+  for (const tab of document.querySelectorAll("#page .tabs-list a[href]:not([aria-current])")) {
+    if (inPlace(tab)) prefetch(tab.href);
+  }
+}
 
 function arrive() {
   const heading = document.querySelector("#main h1");
@@ -291,5 +309,6 @@ addEventListener("popstate", () => {
 });
 
 let contentsReady = completeContents(true).catch(() => {});
+(window.requestIdleCallback ?? ((run) => setTimeout(run, 200)))(prefetchTabs);
 focusFilterOnPhone();
 if (location.hash.length <= 1) showChange(false);

@@ -337,7 +337,8 @@ describe("styles.css", () => {
     expect(css).toContain(".shell>main:not(:has(~.rail)){grid-column:1/-1}");
     expect(css).not.toContain(".doc :is(p,ul,ol,dl,pre,.summary)");
     expect(media("(min-width:1360px)")).toContain(".with-contents .warning.fresh-note{display:none}");
-    expect(block(".time .date-row")).toBe(".time .date-row{min-width:0;align-items:center");
+    expect(block(".time .date-row")).toBe(".time .date-row{flex-wrap:nowrap;min-width:0;align-items:center");
+    expect(block(".time .date-row .btn")).toBe(".time .date-row .btn{flex:none");
     expect(block(".time .date-row select.field")).toBe(".time .date-row select.field{flex:0 1 auto;min-width:0");
     expect(css).not.toContain(":not(:has(~.rail)) :is(p,ul,ol,dl,pre,.summary)");
     expect(block(".law")).toContain("max-width:calc(64ch + var(--mk))");
@@ -629,12 +630,13 @@ describe("styles.css", () => {
     expect(css).not.toContain(".stats");
   });
 
-  it("separates the two pagination cells with a hairline and stacks them on phones", () => {
+  it("separates the two pagination cells with a hairline and keeps them side by side on phones", () => {
     expect(block(".pagination-prev+.pagination-next")).toContain("border-left:1px solid var(--border)");
     expect(block(".pagination-label")).toContain("color:var(--brand);font-family:var(--serif)");
     expect(block(".pagination-prev:has(+.pagination-next)")).toBe(".pagination-prev:has(+.pagination-next){padding-right:24px");
     expect(block(".pagination-title")).toContain("text-transform:uppercase");
-    expect(phone).toContain(".pagination{flex-direction:column}");
+    expect(phone).not.toContain(".pagination{flex-direction:column}");
+    expect(phone).toContain(".pagination-prev+.pagination-next{padding-left:12px}");
   });
 
   it("sets the law text in the serif with the marker in the margin, bars only for the attribution and the gold mark", () => {
