@@ -433,7 +433,7 @@ export const strings = {
   aboutScopeHeading: "Ce conține",
   aboutScopeText: "Deocamdată, Textdelege conține doar Constituția și codurile, inclusiv cele abrogate, păstrate pentru istoricul lor. Lista completă este pe {link}.",
   aboutScopeLink: "pagina principală",
-  aboutScopeOther: "Celelalte legi, ordonanțele și hotărârile nu sunt încă incluse. Un act care a modificat un cod are o pagină cu ce a schimbat în cod și cu legătura spre textul lui oficial de pe legislatie.just.ro, dar textul lui nu este reprodus aici.",
+  aboutScopeOther: "Celelalte legi, ordonanțele și hotărârile nu sunt încă incluse. Pentru o lege care a modificat un cod, site-ul arată doar articolele din cod pe care le-a schimbat, nu și textul complet al legii, cu legătura spre textul oficial de pe legislatie.just.ro.",
   aboutLimitsHeading: "Limite",
   aboutLimitsUnofficial: "Textele consolidate de aici nu sunt oficiale. Singura formă autentică este cea publicată în Monitorul Oficial al României.",
   aboutLimitsAmended: "Unele acte apar în sursă ca modificate, dar neconsolidate: modificările lor sunt cunoscute, dar nu a fost publicată o formă consolidată, așa că textul poate să nu reflecte toate schimbările.",

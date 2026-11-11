@@ -47,7 +47,7 @@ Deocamdată doar Constituția și codurile:
 - **abrogate, păstrate pentru istoricul lor:** Codul civil din 1864, Codul de procedură civilă din 1865, Codul penal din 1968, Codul de procedură penală din 1968, Codul familiei din 1953 și Codul fiscal din 2003;
 - **neconsolidat în sursă:** Codul silvic din 1962.
 
-Celelalte legi, ordonanțele și hotărârile nu sunt încă incluse. Un act care a modificat un cod are o pagină cu ce a schimbat, dar textul lui nu este reprodus aici.
+Celelalte legi, ordonanțele și hotărârile nu sunt încă incluse. Pentru o lege care a modificat un cod, site-ul arată doar articolele din cod pe care le-a schimbat, nu și textul complet al legii.
 
 ### Adrese
 
@@ -114,7 +114,7 @@ For now only the Constitution and the codes:
 - **repealed, kept for their history:** the Civil Code of 1864, Civil Procedure Code of 1865, Penal Code of 1968, Criminal Procedure Code of 1968, Family Code of 1953 and Fiscal Code of 2003;
 - **not consolidated in the source:** the Forestry Code of 1962.
 
-Other laws, ordinances and decisions are not included yet. An act that amended a code has a page listing what it changed, but its own text is not reproduced here.
+Other laws, ordinances and decisions are not included yet. For a law that amended a code, the site shows only the code articles it changed, not the full text of the law.
 
 ### Addresses
 
