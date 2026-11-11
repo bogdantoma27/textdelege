@@ -477,30 +477,35 @@ function Pick(props: {
       </option>
     ));
   return (
-    <Panel title={t("cmpPickTitle")}>
-      <form class="pick" method="get" action={`${articleUrl(props.actRef, article.number)}/compara`}>
-        <label class="label" for="de">
-          {t("cmpPickOld")}
-        </label>
-        <select class="field" id="de" name="de">
-          {options(props.from)}
-        </select>
-        <label class="label" for="pana">
-          {t("cmpPickNew")}
-        </label>
-        <select class="field" id="pana" name="pana">
-          {options(props.to)}
-        </select>
-        {Object.entries(flagParams(props.ctx)).map(([name, value]) => (
-          <input type="hidden" name={name} value={value} />
-        ))}
-        <div class="row">
+    <form class="pick" data-filter="" method="get" action={`${articleUrl(props.actRef, article.number)}/compara`}>
+      <fieldset>
+        <legend>{t("cmpPickTitle")}</legend>
+        <div class="pick-fields">
+          <div>
+            <label class="label" for="de">
+              {t("cmpPickOld")}
+            </label>
+            <select class="field" id="de" name="de">
+              {options(props.from)}
+            </select>
+          </div>
+          <div>
+            <label class="label" for="pana">
+              {t("cmpPickNew")}
+            </label>
+            <select class="field" id="pana" name="pana">
+              {options(props.to)}
+            </select>
+          </div>
           <button class="btn" type="submit">
             {t("cmpCompare")}
           </button>
         </div>
-      </form>
-    </Panel>
+      </fieldset>
+      {Object.entries(flagParams(props.ctx)).map(([name, value]) => (
+        <input type="hidden" name={name} value={value} />
+      ))}
+    </form>
   );
 }
 
@@ -564,7 +569,6 @@ export function renderCompare(
       toc={<Contents {...rail} path={articleUrl(actRef, article.number)} current={article.file} />}
       rail={
         <aside class="rail">
-          <Pick article={article} actRef={actRef} from={older.from} to={newer.from} ctx={ctx} />
           <CitationPanel
             permanent={permanent}
             sentence={t("cmpCiteSentence", {
@@ -611,6 +615,8 @@ export function renderCompare(
             ]}
           />
         </div>
+
+        <Pick article={article} actRef={actRef} from={older.from} to={newer.from} ctx={ctx} />
 
         <section class="time" aria-label={t("timePanelLabel")}>
           <Timeline

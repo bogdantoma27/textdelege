@@ -539,10 +539,12 @@ del .vh,ins .vh{user-select:none}
 .pair.head{padding:4px 0;font-family:var(--font);font-size:calc(14px*var(--k));line-height:20px;color:var(--muted)}
 .pair .cell.empty{margin:4px 0 16px;background:var(--surface)}
 .pair .gap{grid-column:1/-1}
-.pick .label{margin-top:16px}
-.pick .label:first-child{margin-top:0}
+.pick{margin:0 0 24px}
+.pick fieldset{min-width:0;margin:0;padding:0;border:0}
+.pick legend{margin:0 0 8px;padding:0;font-weight:500}
+.pick-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:12px 16px;align-items:end}
+.pick-fields>div{min-width:0}
 .pick select.field{width:100%}
-.pick .row{margin:24px 0 0}
 .cb{--diff-del:#4a2a8a;--diff-del-bg:#e6dcf6;--diff-ins:#6b3a00;--diff-ins-bg:#fde3bf}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cb{--diff-del:#d9c8fb;--diff-del-bg:#2f2350;--diff-ins:#f6cf94;--diff-ins-bg:#402d10}}
 :root[data-theme="dark"] .cb{--diff-del:#d9c8fb;--diff-del-bg:#2f2350;--diff-ins:#f6cf94;--diff-ins-bg:#402d10}
@@ -672,6 +674,8 @@ mark{background:var(--accent-tint);color:var(--text);padding:0 1px}
 }
 
 @media (max-width:640px){
+  .pick-fields{grid-template-columns:minmax(0,1fr)}
+  .pick-fields .btn{justify-self:start}
   .tabs-list{gap:16px}
   .wrap{padding:0 16px}
   .site-header{position:relative}
@@ -732,7 +736,6 @@ mark{background:var(--accent-tint);color:var(--text);padding:0 1px}
   html{scroll-padding-top:16px}
   .doc-main{grid-column:1}
   .home-row{grid-template-columns:minmax(0,1fr);gap:40px}
-  .home .menu{margin-left:auto}
   .footer-head{grid-template-columns:minmax(0,1fr);gap:24px}
   .track,.track.even{height:auto;margin-top:16px;overflow:visible}
   .track-in{height:auto;margin-top:0;min-width:0!important}
@@ -759,6 +762,7 @@ mark{background:var(--accent-tint);color:var(--text);padding:0 1px}
   .search-button{width:44px}
   .btn{min-height:44px}
   .options.inline .checkbox{min-height:44px}
+  .options.inline .checkbox label{padding:12px 0 12px 4px}
   .options.inline .checkbox label::before{top:12px}
   .options.inline .checkbox label::after{top:15px}
   .nav a,.crumbs a,.compare-links a,.status a,.footer-col a,.to-top,.to-bottom,.tabs-item a{display:inline-flex;align-items:center;min-height:44px}

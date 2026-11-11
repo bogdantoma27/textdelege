@@ -252,7 +252,11 @@ describe("article comparison page", () => {
 
   it("renders the version picker, the citation and the amending act", () => {
     const html = view(one, "2011-10-01", "2023-07-09");
-    expect(html).toContain("<h2>Alege versiunile</h2>");
+    expect(html).toContain('<form class="pick" data-filter="" method="get" action="/codul-civil/art-1/compara"><fieldset><legend>Alege versiunile</legend>');
+    const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
+    expect(main.indexOf('class="pick"')).toBeGreaterThan(-1);
+    expect(main.indexOf('class="pick"')).toBeLessThan(main.indexOf('class="time"'));
+    expect(html.slice(html.indexOf('<aside class="rail">'))).not.toContain('class="pick"');
     expect(html).toContain('action="/codul-civil/art-1/compara"');
     expect(html).toContain('<select class="field" id="de" name="de">');
     expect(html).not.toContain("Caractere");
