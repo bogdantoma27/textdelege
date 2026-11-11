@@ -15,6 +15,7 @@ from .gitrepo import GitRepo, normalise_text
 
 BOUNDARY_ACTS = 5
 BOUNDARY_CAP = 400
+CACHED_FLOOR = 50
 ORACLE_TIMEOUT_SECONDS = 120
 LOOKBACK_DAYS = 30
 READER_PATH = "tools/on.py"
@@ -46,13 +47,9 @@ class Mismatch:
     oracle: str | None
 
 
-def sample(
-    articles_by_act: dict[str, list[Article]], n: int, seed: int, today: date
+def _random_picks(
+    articles_by_act: dict[str, list[Article]], acts: list[str], n: int, rng: random.Random, today: date
 ) -> list[Sample]:
-    rng = random.Random(seed)
-    acts = sorted(
-        act for act, articles in articles_by_act.items() if any(a.versions for a in articles)
-    )
     picked: list[Sample] = []
     for _ in range(n if acts else 0):
         act = rng.choice(acts)
@@ -60,11 +57,34 @@ def sample(
         first = min(v.from_ for v in article.versions) - timedelta(days=LOOKBACK_DAYS)
         offset = rng.randint(0, max((today - first).days, 0))
         picked.append(Sample(act, article.file, first + timedelta(days=offset)))
+    return picked
+
+
+def sample(
+    articles_by_act: dict[str, list[Article]],
+    n: int,
+    seed: int,
+    today: date,
+    fresh: set[str] | None = None,
+) -> list[Sample]:
+    rng = random.Random(seed)
+    acts = sorted(
+        act for act, articles in articles_by_act.items() if any(a.versions for a in articles)
+    )
+    if fresh is None:
+        picked = _random_picks(articles_by_act, acts, n, rng, today)
+        boundary_acts = acts
+    else:
+        fresh_acts = [act for act in acts if act in fresh]
+        cached_acts = [act for act in acts if act not in fresh]
+        picked = _random_picks(articles_by_act, fresh_acts, n, rng, today)
+        picked += _random_picks(articles_by_act, cached_acts, min(n, CACHED_FLOOR), rng, today)
+        boundary_acts = fresh_acts
 
     start_days = {
-        act: {v.from_ for a in articles_by_act[act] for v in a.versions} for act in acts
+        act: {v.from_ for a in articles_by_act[act] for v in a.versions} for act in boundary_acts
     }
-    busiest = sorted(acts, key=lambda act: (-len(start_days[act]), act))[:BOUNDARY_ACTS]
+    busiest = sorted(boundary_acts, key=lambda act: (-len(start_days[act]), act))[:BOUNDARY_ACTS]
     boundaries: list[Sample] = []
     for act in busiest:
         for day in sorted(start_days[act]):

@@ -9,16 +9,18 @@ import sys
 import time
 import traceback
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from . import extractcache
 from .acts import ActMeta, old_folder_for, select_acts
 from .config import Config, load_config
 from .d1 import SCHEMA_VERSION, D1Client, D1Error, D1QuotaExceeded
 from .events import events_for
-from .extract import Article, extract_act, version_on
+from .extract import Article, extract_core, finalize_act, version_on
 from .freshness import INDEX, load_freshness, load_freshness_summary, shard_files
 from .gitrepo import GitError, GitRepo, remove_tree
 from .laws import changes_feed, laws_from, parse_laws_csv, upcoming
@@ -55,6 +57,7 @@ DATA_FILES = (
 )
 REPO_DIR = "romania-law"
 FEED_LIMIT = 100
+NEWEST_WORKERS = 8
 STATE_KEYS = (
     "source_head", "fingerprint", "build", "today", "selection", "source_url", "schema_version"
 )
@@ -82,6 +85,9 @@ class Extracted:
     rulings: list[Ruling]
     history_blobs: int = 0
     head_blobs: int = 0
+    fresh_acts: set[str] | None = None
+    pending_cache: list[tuple[str, str, list]] = field(default_factory=list)
+    timings: dict[str, float] = field(default_factory=dict)
 
 
 def fingerprint() -> str:
@@ -91,6 +97,14 @@ def fingerprint() -> str:
         digest.update(path.name.encode("utf-8") + b"\0")
         digest.update(path.read_bytes() + b"\0")
     return digest.hexdigest()
+
+
+def timing_line(fetch: float, extract: float, events: float, verify: float, publish: float) -> str:
+    phases = (
+        ("fetch", fetch), ("extract", extract), ("events", events),
+        ("verify", verify), ("publish", publish),
+    )
+    return ", ".join(f"{name} {seconds:.1f} s" for name, seconds in phases)
 
 
 def build_day(now: datetime) -> date:
@@ -177,7 +191,10 @@ def _require(repo: GitRepo, head: str, path: str) -> str:
     return text
 
 
-def extract_source(repo: GitRepo, config: Config, today: date) -> Extracted:
+def extract_source(
+    repo: GitRepo, config: Config, today: date, *, use_cache: bool = False
+) -> Extracted:
+    fetch_started = time.monotonic()
     head = repo.head()
     head_blobs = repo.prefetch_head(["data/acts.json", "data/paths.json"])
     acts_json = json.loads(_require(repo, head, "data/acts.json"))
@@ -212,19 +229,52 @@ def extract_source(repo: GitRepo, config: Config, today: date) -> Extracted:
     laws_csv = repo.show_file(head, "data/laws.csv") or ""
     labels = {key: row["label"] for key, row in parse_laws_csv(laws_csv).items()}
     credits = parse_credits(repo.show_file(head, "data/credits.csv") or "")
+    fetch_seconds = time.monotonic() - fetch_started
+    extract_started = time.monotonic()
     articles_by_act = {}
+    fresh: set[str] = set()
+    pending = []
+    code = extractcache.code_hash()
+    newest: dict[str, str | None] = {}
+    if use_cache:
+        with ThreadPoolExecutor(max_workers=NEWEST_WORKERS) as pool:
+            for meta, sha in zip(metas, pool.map(
+                lambda m: repo.newest_commit(
+                    [m.path] + ([old_folders[m.path]] if old_folders[m.path] else [])
+                ),
+                metas,
+            )):
+                newest[meta.path] = sha
     for meta in metas:
         act_credits = {**credits.get(meta.slug, {}), **credits.get(meta.path, {})}
-        articles_by_act[meta.path] = extract_act(
-            repo, meta.path, old_folders[meta.path],
-            credits=act_credits, law_labels=labels, today=today,
-        )
+        cores = None
+        if use_cache:
+            key = extractcache.act_fingerprint(
+                newest_commit=newest[meta.path],
+                folders=[meta.path] + ([old_folders[meta.path]] if old_folders[meta.path] else []),
+                credits=act_credits,
+                law_labels=labels,
+                code=code,
+            )
+            cores = extractcache.load(config.cache_dir, meta.path, key)
+        if cores is None:
+            cores = extract_core(
+                repo, meta.path, old_folders[meta.path],
+                credits=act_credits, law_labels=labels,
+            )
+            fresh.add(meta.path)
+            if use_cache:
+                pending.append((meta.path, key, cores))
+        articles_by_act[meta.path] = finalize_act(cores, today)
     rulings, warnings = load_rulings(repo, selected, rulings_by_provision, decisions_csv)
     for warning in warnings:
         print(f"warning: {warning}", file=sys.stderr)
     return Extracted(
         metas, old_folders, articles_by_act, laws_csv, rulings_by_provision, rulings,
         history_blobs, head_blobs,
+        fresh_acts=fresh if use_cache and len(fresh) < len(metas) else None,
+        pending_cache=pending,
+        timings={"fetch": fetch_seconds, "extract": time.monotonic() - extract_started},
     )
 
 
@@ -409,7 +459,7 @@ def run_checks(
     repo: GitRepo, data: Extracted, n: int, seed: int | None, today: date, oracle
 ) -> tuple[list[Sample], list[Mismatch], int]:
     seed = int(repo.head()[:8], 16) if seed is None else seed
-    samples = sample(data.articles_by_act, n, seed, today)
+    samples = sample(data.articles_by_act, n, seed, today, fresh=data.fresh_acts)
     mismatches = verify(
         repo, data.articles_by_act, samples, old_folders=data.old_folders, oracle=oracle
     )
@@ -423,6 +473,9 @@ def cmd_build(args, *, today, now, oracle, r2, d1) -> int:
     config.cache_dir.mkdir(parents=True, exist_ok=True)
     state = read_state(config, d1)
     repo, rewritten, recloned = open_source(config, state["source_head"] if state else None)
+    if rewritten or recloned:
+        extractcache.wipe(config.cache_dir)
+    open_seconds = time.monotonic() - started
     head = repo.head()
     new_state = {
         "source_head": head,
@@ -440,10 +493,18 @@ def cmd_build(args, *, today, now, oracle, r2, d1) -> int:
         report([("Source head", head[:7]), ("Build", state.get("build", ""))], noop)
         return 0
 
-    data = extract_source(repo, config, today)
+    data = extract_source(repo, config, today, use_cache=True)
+    verify_started = time.monotonic()
     samples, mismatches, _seed = run_checks(repo, data, args.sample, args.seed, today, oracle)
+    verify_seconds = time.monotonic() - verify_started
+    if not mismatches:
+        for act_path, key, cores in data.pending_cache:
+            extractcache.store(config.cache_dir, act_path, key, cores)
     build_id = new_state["build"]
+    events_started = time.monotonic()
     objects, rows, manifest, counts = build_outputs(repo, data, build_id, now, today)
+    events_seconds = time.monotonic() - events_started
+    publish_started = time.monotonic()
 
     def finish(failed: bool, live_build: str = build_id, extra: str | None = None) -> None:
         fields = [
@@ -452,6 +513,10 @@ def cmd_build(args, *, today, now, oracle, r2, d1) -> int:
             ("Laws", counts["laws"]), ("Rulings", counts["rulings"]),
             ("Prefetched", f"{data.history_blobs} history blobs, {data.head_blobs} head blobs"),
             ("Sample size", len(samples)), ("Mismatches", len(mismatches)),
+            ("Timing", timing_line(
+                data.timings["fetch"] + open_seconds, data.timings["extract"], events_seconds,
+                verify_seconds, time.monotonic() - publish_started,
+            )),
             ("Duration", f"{time.monotonic() - started:.1f} s"),
         ]
         extra = extra or (

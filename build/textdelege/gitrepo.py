@@ -181,6 +181,10 @@ class GitRepo:
             if record.strip()
         ]
 
+    def newest_commit(self, paths: list[str]) -> str | None:
+        output = self._git("log", "--no-merges", "-n", "1", "--format=%H", "--", *paths)
+        return output.strip() or None
+
     def log_with_paths(self, paths: list[str]) -> list[tuple[Commit, set[str]]]:
         output = self._git(
             "-c",

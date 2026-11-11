@@ -165,6 +165,17 @@ def _spans_per_file(
     return spans, absent_since
 
 
+@dataclass
+class ArticleCore:
+    file: str
+    number: str
+    title: str | None
+    versions: list[Version]
+    absent_since: date | None
+    removed_by_key: str | None
+    removed_by_label: str | None
+
+
 def extract_act(
     repo: GitRepo,
     folder: str,
@@ -174,13 +185,24 @@ def extract_act(
     law_labels: dict[str, str],
     today: date,
 ) -> list[Article]:
+    return finalize_act(extract_core(repo, folder, old_folder, credits=credits, law_labels=law_labels), today)
+
+
+def extract_core(
+    repo: GitRepo,
+    folder: str,
+    old_folder: str | None,
+    *,
+    credits: dict[tuple[str, str], str],
+    law_labels: dict[str, str],
+) -> list[ArticleCore]:
     with repo.blobs() as reader:
-        return _extract_act(
-            repo, reader, folder, old_folder, credits=credits, law_labels=law_labels, today=today
+        return _extract_core(
+            repo, reader, folder, old_folder, credits=credits, law_labels=law_labels
         )
 
 
-def _extract_act(
+def _extract_core(
     repo: GitRepo,
     reader: BlobReader,
     folder: str,
@@ -188,8 +210,7 @@ def _extract_act(
     *,
     credits: dict[tuple[str, str], str],
     law_labels: dict[str, str],
-    today: date,
-) -> list[Article]:
+) -> list[ArticleCore]:
     commits = act_commits(repo, folder, old_folder)
     days = in_force_days(commits)
     listings = {day: tree_and_folder_for_day(repo, commits, day, folder, old_folder) for day in days}
@@ -230,7 +251,7 @@ def _extract_act(
                 law_key, law_label = "", UNEXPLAINED_LABEL
         return source, law_key, law_label
 
-    articles = []
+    cores = []
     for name in sorted(spans, key=_sort_key):
         versions = []
         for span in spans[name]:
@@ -260,18 +281,30 @@ def _extract_act(
         last_text = text_of(spans[name][-1].blob)
         title, _body = split_body(last_text)
         number = _heading_number(last_text) or _number_from_file(name)
-        repealed_on = absent_since.get(name)
+        absent = absent_since.get(name)
+        removed_by_key = removed_by_label = None
+        if absent is not None:
+            _remover, removed_by_key, removed_by_label = attribute(
+                name, absent, commit_for_day(commits, absent)
+            )
+        cores.append(ArticleCore(name, number, title, versions, absent, removed_by_key, removed_by_label))
+    return cores
+
+
+def finalize_act(cores: list[ArticleCore], today: date) -> list[Article]:
+    articles = []
+    for core in cores:
+        versions = core.versions
+        repealed_on = core.absent_since
         repealed_by_key = repealed_by_label = None
         if versions[0].from_ > today:
             state = "future"
         elif repealed_on is not None and versions[-1].until < today:
             state = "repealed"
-            _remover, repealed_by_key, repealed_by_label = attribute(
-                name, repealed_on, commit_for_day(commits, repealed_on)
-            )
+            repealed_by_key, repealed_by_label = core.removed_by_key, core.removed_by_label
         else:
             state = "in-force"
-            current = version_on(Article(name, "", None, versions, state, None), today)
+            current = version_on(Article(core.file, "", None, versions, state, None), today)
             current = current or versions[-1]
             if [line.text for line in current.lines] == ["Abrogat."]:
                 state = "repealed"
@@ -279,9 +312,9 @@ def _extract_act(
                 repealed_by_key, repealed_by_label = current.law_key, current.law_label
         articles.append(
             Article(
-                file=name,
-                number=number,
-                title=title,
+                file=core.file,
+                number=core.number,
+                title=core.title,
                 versions=versions,
                 state=state,
                 repealed_on=repealed_on if state == "repealed" else None,
