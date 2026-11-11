@@ -193,6 +193,37 @@ describe("search", () => {
     expect(html).not.toContain("page-numbers");
   });
 
+  it("shows only the cap and no pages beyond it when the matches pass a thousand", async () => {
+    await env.DB.prepare(
+      `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1030)
+       INSERT INTO articles_fts (act_path, file, state, number, title, text)
+       SELECT 'lege/2010/134', 'art-pg-' || printf('%04d', i), 'in-force', CAST(i AS TEXT), NULL, 'zzplafonat ' || i FROM n`,
+    ).run();
+    const first = await page("/cauta?q=zzplafonat");
+    expect(first).toContain('<span class="count">Peste 1.000 de rezultate</span>');
+    expect(first).toContain('aria-label="Pagina 50"');
+    expect(first).not.toContain('aria-label="Pagina 51"');
+    const past = await page("/cauta?q=zzplafonat&pagina=99");
+    expect(past).toContain('aria-label="Pagina 50" aria-current="page"');
+    expect(past.match(/<li class="hit">/g)).toHaveLength(20);
+  });
+
+  it("answers a live request with at most eight hits and no count", async () => {
+    await insertMany(30);
+    const live = await page("/cauta?q=zzpaginat&live=1");
+    expect(live.match(/<li class="hit">/g)).toHaveLength(8);
+    expect(live).not.toContain('class="count"');
+    expect(live).not.toContain("results-bar");
+    expect(live).not.toContain("page-numbers");
+    expect(live).toContain("noindex");
+  });
+
+  it("matches a three-letter last word whole and a four-letter one as a prefix", async () => {
+    await insertMany(3);
+    expect(await page("/cauta?q=zzpag")).toContain('<span class="count">3 rezultate</span>');
+    expect(await page("/cauta?q=zzp")).toContain("Niciun rezultat");
+  });
+
   it("keeps the in-force checkbox checked", async () => {
     const html = await page("/cauta?q=text&in_force=1");
     expect(html).toMatch(/name="in_force"[^>]*checked/);

@@ -12,7 +12,7 @@ import { lawRoutes } from "./routes/law";
 import { pointInTimeRoutes } from "./routes/pointInTime";
 import { rulingRoutes } from "./routes/ruling";
 import { searchRoutes } from "./routes/search";
-import { errorHandler, notFoundHandler } from "./routes/site";
+import { errorHandler, notFoundHandler, siteRoutes } from "./routes/site";
 import { ORIGIN } from "./views/layout";
 
 const app = new Hono<AppEnv>();
@@ -62,6 +62,7 @@ app.use("*", async (c, next) => {
   await withSources(manifest?.status?.official_sources ?? [], next, manifest?.generated?.slice(0, 10) ?? null);
 });
 
+app.route("/", siteRoutes);
 app.route("/", homeRoutes);
 app.route("/", searchRoutes);
 app.route("/", changesRoutes);

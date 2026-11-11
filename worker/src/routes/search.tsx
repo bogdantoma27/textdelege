@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { type Citation, citationUrl, parseCitation } from "../lib/citation";
-import type { AppEnv, Store } from "../lib/store";
+import { COUNT_CAP, type AppEnv, type Store } from "../lib/store";
 import type { Manifest } from "../lib/types";
 import { lawKeyFromActRef, lawUrlFromKey } from "../lib/urls";
 import { actNames } from "../views/changes";
@@ -21,6 +21,8 @@ async function amendingActUrl(store: Store, citation: Citation): Promise<string 
   return lawUrlFromKey(key);
 }
 
+export const LIVE_LIMIT = 8;
+
 export const searchRoutes = new Hono<AppEnv>();
 
 searchRoutes.get("/cauta", async (c) => {
@@ -30,7 +32,7 @@ searchRoutes.get("/cauta", async (c) => {
   const manifest = await store.manifest();
   const names = actNames(manifest);
 
-  if (query === "") return c.html(renderSearch({ query, inForce, hits: null, total: 0, page: 1, pages: 1, names }));
+  if (query === "") return c.html(renderSearch({ query, inForce, hits: null, total: 0, over: false, live: false, page: 1, pages: 1, names }));
 
   const citation = parseCitation(query);
   const target = citation === null ? null : citationUrl(citation);
@@ -40,9 +42,16 @@ searchRoutes.get("/cauta", async (c) => {
   const law = citation === null ? null : await amendingActUrl(store, citation);
   if (law !== null) return c.redirect(law, 302);
 
-  const total = await store.searchCount(query, inForce);
+  if (c.req.query("live") === "1") {
+    const hits = await store.search(query, inForce, LIVE_LIMIT);
+    return c.html(renderSearch({ query, inForce, hits, total: hits.length, over: false, live: true, page: 1, pages: 1, names }));
+  }
+
+  const counted = await store.searchCount(query, inForce);
+  const over = counted > COUNT_CAP;
+  const total = Math.min(counted, COUNT_CAP);
   const pages = Math.max(1, Math.ceil(total / HITS_LIMIT));
   const page = Math.min(pageNumber(c.req.query("pagina") ?? null), pages);
   const hits = total === 0 ? [] : await store.search(query, inForce, HITS_LIMIT, (page - 1) * HITS_LIMIT);
-  return c.html(renderSearch({ query, inForce, hits, total, page, pages, names }));
+  return c.html(renderSearch({ query, inForce, hits, total, over, live: false, page, pages, names }));
 });

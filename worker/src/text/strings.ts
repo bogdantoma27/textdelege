@@ -328,6 +328,7 @@ export const strings = {
   searchResultsOne: "{n} rezultat",
   searchResultsFew: "{n} rezultate",
   searchResultsMany: "{n} de rezultate",
+  searchCountOver: "Peste {n} de rezultate",
   searchNone: "Niciun rezultat pentru „{q}”",
   searchTipsLead: "Ce poți încerca:",
   searchTipSpelling: "Verifică ortografia; diacriticele nu contează.",

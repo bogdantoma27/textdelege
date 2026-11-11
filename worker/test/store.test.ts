@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { afterEach, describe, expect, it } from "vitest";
-import { createStore, toSafeHtml } from "../src/lib/store";
+import { COUNT_CAP, createStore, toMatchQuery, toSafeHtml } from "../src/lib/store";
 
 const CIVIL = "lege/2009/287";
 const PROCEDURE = "lege/2010/134";
@@ -90,6 +90,14 @@ describe("store", () => {
     expect(await store.searchCount("doilea", true)).toBe(2);
   });
 
+  it("makes the last word a prefix only from four characters", () => {
+    expect(toMatchQuery("art doi")).toBe('"art" "doi"');
+    expect(toMatchQuery("art doil")).toBe('"art" "doil"*');
+    expect(toMatchQuery("șțăî")).toBe('"șțăî"*');
+    expect(toMatchQuery("abc")).toBe('"abc"');
+    expect(toMatchQuery("")).toBe("");
+  });
+
   it("search finds a title match and marks it in the snippet", async () => {
     const store = createStore(env);
     const hits = await store.search("titlu", true, 10);
@@ -129,6 +137,21 @@ describe("store", () => {
     expect(await store.searchCount("procedura", true)).toBe(1);
     expect(await store.searchCount("   ", false)).toBe(0);
     expect(await store.searchCount("nimicnimic", false)).toBe(0);
+  });
+
+  it("searchCount stops counting just above the cap", async () => {
+    const store = createStore(env);
+    await env.DB.prepare(
+      `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${COUNT_CAP + 50})
+       INSERT INTO articles_fts (act_path, file, state, number, title, text)
+       SELECT 'lege/2010/134', 'art-cap-' || i, 'in-force', CAST(i AS TEXT), NULL, 'zzplafonat ' || i FROM n`,
+    ).run();
+    try {
+      expect(await store.searchCount("zzplafonat", true)).toBe(COUNT_CAP + 1);
+      expect(await store.searchCount("zzplafonat", false)).toBe(COUNT_CAP + 1);
+    } finally {
+      await env.DB.prepare("DELETE FROM articles_fts WHERE file LIKE 'art-cap-%'").run();
+    }
   });
 
   it("search escapes HTML in snippets and keeps only its own marks", async () => {

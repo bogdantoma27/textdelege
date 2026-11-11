@@ -118,8 +118,21 @@ describe("page cache", () => {
     await again(path);
   });
 
-  it("keeps the home page, the search and the health check out of the cache, and errors too", async () => {
-    for (const path of ["/", "/cauta?q=lege", "/healthz", "/nu-exista"]) {
+  it("stores a search page like any other, and does not store its redirects", async () => {
+    const path = "/cauta?q=text";
+    const first = await get(path);
+    expect(first.status).toBe(200);
+    expect(first.headers.get("Cache-Status")).toBe("textdelege; fwd=miss; stored");
+    expect(first.headers.get("Cache-Control")).toBe("public, max-age=300, s-maxage=604800");
+    await again(path);
+    const redirect = await get("/cauta?q=art.+1+Codul+civil");
+    expect(redirect.status).toBe(302);
+    expect(redirect.headers.get("Cache-Status")).toBeNull();
+    expect((await get("/cauta?q=art.+1+Codul+civil")).status).toBe(302);
+  });
+
+  it("keeps the home page and the health check out of the cache, and errors too", async () => {
+    for (const path of ["/", "/healthz", "/nu-exista"]) {
       const response = await get(path);
       expect(response.headers.get("Cache-Status")).toBeNull();
       expect(response.headers.get("Cache-Control")).toBeNull();

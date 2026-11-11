@@ -29,8 +29,19 @@ export interface Store {
   changes(scope: string): Promise<ChangesObject | null>;
   search(q: string, inForceOnly: boolean, limit: number, offset?: number): Promise<SearchHit[]>;
   searchCount(q: string, inForceOnly: boolean): Promise<number>;
+  sitemapTotal(): Promise<number>;
+  sitemapEntries(limit: number, offset: number): Promise<SitemapEntry[]>;
   resolveAlias(alias: string): Promise<string | null>;
   actRulings(path: string): Promise<ArticleRuling[]>;
+}
+
+export const PREFIX_MIN = 4;
+export const COUNT_CAP = 1000;
+
+export interface SitemapEntry {
+  actRef: string;
+  number: string | null;
+  lastmod: string | null;
 }
 
 const MANIFEST_KEY = "manifest.json";
@@ -46,11 +57,13 @@ async function readJson<T>(bucket: R2Bucket, key: string): Promise<T | null> {
   return JSON.parse(text) as T;
 }
 
-function toMatchQuery(q: string): string {
+export function toMatchQuery(q: string): string {
   return q
     .split(/[^\p{L}\p{N}]+/u)
     .filter((token) => token !== "")
-    .map((token, index, tokens) => (index === tokens.length - 1 ? `"${token}"*` : `"${token}"`))
+    .map((token, index, tokens) =>
+      index === tokens.length - 1 && [...token].length >= PREFIX_MIN ? `"${token}"*` : `"${token}"`,
+    )
     .join(" ");
 }
 
@@ -147,11 +160,40 @@ export function createStore(env: Env): Store {
       }
       const stateFilter = inForceOnly ? "AND state = 'in-force'" : "";
       const row = await env.DB.prepare(
-        `SELECT COUNT(*) AS total FROM articles_fts WHERE articles_fts MATCH ?1 ${stateFilter}`,
+        `SELECT COUNT(*) AS total FROM (SELECT 1 FROM articles_fts WHERE articles_fts MATCH ?1 ${stateFilter} LIMIT ${COUNT_CAP + 1})`,
       )
         .bind(match)
         .first<{ total: number }>();
       return row?.total ?? 0;
+    },
+
+    async sitemapTotal() {
+      const row = await env.DB.prepare(
+        "SELECT (SELECT COUNT(*) FROM acts) + (SELECT COUNT(*) FROM articles) AS total",
+      ).first<{ total: number }>();
+      return row?.total ?? 0;
+    },
+
+    async sitemapEntries(limit, offset) {
+      const { results } = await env.DB.prepare(
+        `SELECT u.act_path, COALESCE(ac.alias, u.act_path) AS act_ref, u.file, u.number, u.lastmod FROM (
+           SELECT a.path AS act_path, '' AS file, NULL AS number,
+                  (SELECT MAX(last_change) FROM articles WHERE act_path = a.path) AS lastmod
+             FROM acts a
+           UNION ALL
+           SELECT act_path, file, number, last_change AS lastmod FROM articles
+         ) u
+         LEFT JOIN acts ac ON ac.path = u.act_path
+         ORDER BY u.act_path, u.file
+         LIMIT ?1 OFFSET ?2`,
+      )
+        .bind(Math.max(0, Math.floor(limit)), clampOffset(offset))
+        .all<{ act_ref: string; file: string; number: string | null; lastmod: string | null }>();
+      return results.map((row) => ({
+        actRef: row.act_ref,
+        number: row.file === "" ? null : row.number,
+        lastmod: row.lastmod,
+      }));
     },
 
     async actRulings(path) {

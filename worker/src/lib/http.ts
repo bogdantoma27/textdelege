@@ -44,8 +44,8 @@ export const securityHeaders: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.res = response;
 };
 
-// Never cache these: the home page is random, search answers a query, healthz is live.
-const UNCACHED = new Set(["/", "/cauta", "/healthz"]);
+// Never cache these: the home page is random, healthz is live.
+const UNCACHED = new Set(["/", "/healthz"]);
 
 const CACHE_CONTROL = "public, max-age=300, s-maxage=604800";
 

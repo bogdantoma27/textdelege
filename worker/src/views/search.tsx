@@ -87,6 +87,8 @@ export interface SearchPage {
   inForce: boolean;
   hits: SearchHit[] | null;
   total: number;
+  over: boolean;
+  live: boolean;
   page: number;
   pages: number;
   names: ActNames;
@@ -125,21 +127,25 @@ export function renderSearch(page: SearchPage) {
         )}
         {hits !== null && hits.length > 0 && (
           <section>
-            <div class="results-bar">
-              <span class="count">
-                {page.pages > 1
-                  ? t("searchRange", {
-                      first: grouped((page.page - 1) * HITS_LIMIT + 1),
-                      last: grouped((page.page - 1) * HITS_LIMIT + hits.length),
-                      total: grouped(page.total),
-                    })
-                  : tPlural(page.total, {
-                      one: "searchResultsOne",
-                      few: "searchResultsFew",
-                      many: "searchResultsMany",
-                    })}
-              </span>
-            </div>
+            {!page.live && (
+              <div class="results-bar">
+                <span class="count">
+                  {page.over
+                    ? t("searchCountOver", { n: grouped(page.total) })
+                    : page.pages > 1
+                    ? t("searchRange", {
+                        first: grouped((page.page - 1) * HITS_LIMIT + 1),
+                        last: grouped((page.page - 1) * HITS_LIMIT + hits.length),
+                        total: grouped(page.total),
+                      })
+                    : tPlural(page.total, {
+                        one: "searchResultsOne",
+                        few: "searchResultsFew",
+                        many: "searchResultsMany",
+                      })}
+                </span>
+              </div>
+            )}
             <ul class="plain hits">
               {hits.map((hit) => (
                 <Hit hit={hit} names={page.names} />

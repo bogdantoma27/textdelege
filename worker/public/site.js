@@ -86,7 +86,9 @@ function initSearchForms() {
 }
 
 const LIVE_DELAY = 250;
-const LIVE_MIN_LENGTH = 2;
+const LIVE_MIN_LENGTH = 3;
+const PREFIX_MIN = 4;
+const partial = (query) => [...(query.split(/[^\p{L}\p{N}]+/u).filter(Boolean).at(-1) ?? "")].length < PREFIX_MIN;
 
 function initLiveSearch() {
   let serial = 0;
@@ -166,7 +168,7 @@ function initLiveSearch() {
       controller?.abort();
       controller = new AbortController();
       try {
-        const response = await fetch(`/cauta?q=${encodeURIComponent(query)}`, {
+        const response = await fetch(`/cauta?q=${encodeURIComponent(query)}&live=1`, {
           credentials: "same-origin",
           signal: controller.signal,
         });
@@ -186,6 +188,7 @@ function initLiveSearch() {
           result.status = note?.textContent.trim() ?? "";
         }
         cache.set(query, result);
+        if (result.hits.length === 0 && partial(query)) return;
         render(query, result);
       } catch (error) {
         if (error.name !== "AbortError") hide();
@@ -202,6 +205,7 @@ function initLiveSearch() {
       const cached = cache.get(query);
       if (cached) {
         controller?.abort();
+        if (cached.hits.length === 0 && partial(query)) return;
         render(query, cached);
       } else {
         timer = setTimeout(() => load(query), LIVE_DELAY);
