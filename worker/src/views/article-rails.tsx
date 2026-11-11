@@ -360,7 +360,7 @@ export function Rail(props: RailProps) {
       />
       {article.rulings.length > 0 && (
         <Panel title={t("rulingsTitle")}>
-          <ul class="plain">
+          <ul class="plain ruling-list">
             {article.rulings.map((ruling) => (
               <li>
                 <RulingLink rulingKey={ruling.key} label={ruling.label} />

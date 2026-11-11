@@ -715,7 +715,7 @@ describe("styles.css", () => {
   it("opens the third column, the pinned rail and the contents beside the text only where the text keeps its measure", () => {
     const wide = media("(min-width:1360px)");
     expect(wide).toContain(".with-contents .shell{grid-template-columns:260px minmax(0,1fr) 300px;grid-template-rows:minmax(0,1fr) auto}");
-    expect(wide).toContain(".with-contents .shell>.rail{grid-column:3;grid-row:1/3;position:sticky;top:calc(var(--head) + 32px);max-height:calc(100vh - var(--head) - 152px)");
+    expect(wide).toContain(".with-contents .shell>.rail{grid-column:3;grid-row:1/3;position:sticky;top:calc(var(--head) + 32px);max-height:calc(100vh - var(--head) - 64px);margin-top:0;padding-bottom:64px");
     expect(css).not.toContain("232px");
     const rail = block(".with-contents .shell>.rail");
     expect(rail).toContain("grid-column:2;grid-row:2;margin-top:32px");
@@ -821,5 +821,13 @@ describe("styles.css", () => {
     expect(block("sup")).toContain("line-height:0");
     expect(block(".vh")).toContain("clip-path");
     expect(block(".vh")).not.toContain("display:none");
+  });
+});
+
+describe("case law in the rail", () => {
+  it("scrolls inside its own list after about six decisions", () => {
+    expect(block(".rail .ruling-list")).toContain(
+      "max-height:calc(6.5 * (2 * var(--xs-lh) + 17px));overflow-y:auto;overscroll-behavior:contain",
+    );
   });
 });
