@@ -90,7 +90,7 @@ const EXAMPLES: Key[] = [
   "homeExampleCivilProcedure",
   "homeExamplePenalProcedure",
   "homeExampleAdministrative",
-  "homeExampleCompanies",
+  "homeExampleCustoms",
 ];
 const SHOWN_EXAMPLES = 3;
 

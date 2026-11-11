@@ -30,7 +30,7 @@
 
 Textul unei legi pe care îl găsești pe internet este aproape mereu cel de azi. Din el nu afli de când se aplică și nici cum arăta înainte. Dacă ai nevoie de forma unui articol la o anumită dată, de exemplu ziua în care ai semnat un contract, trebuie să refaci singur modificările, una câte una.
 
-Textdelege arată fiecare articol din Constituție și din cele 20 de coduri, actuale și abrogate, în toate versiunile lui:
+Textdelege arată fiecare articol din Constituție și din 20 de coduri, în toate versiunile lui:
 
 - alegi o zi și citești textul care se aplica atunci;
 - pui două versiuni una lângă alta și vezi, cuvânt cu cuvânt, ce s-a schimbat;
@@ -38,6 +38,16 @@ Textdelege arată fiecare articol din Constituție și din cele 20 de coduri, ac
 - vezi lângă articol deciziile Curții Constituționale și ale Înaltei Curți care îl privesc.
 
 Textele vin din [lexifina/romania-law](https://github.com/lexifina/romania-law), un repo public în care fiecare articol este un fișier și fiecare modificare este un commit datat cu ziua intrării în vigoare. Textdelege nu adaugă text juridic propriu. Afișează aceste fișiere, spune din ce commit provine fiecare text și trimite la pagina oficială de pe legislatie.just.ro.
+
+### Ce conține
+
+Deocamdată doar Constituția și codurile:
+
+- **în vigoare:** Codul civil, Codul penal, Codul de procedură civilă, Codul de procedură penală, Codul fiscal, Codul de procedură fiscală, Codul muncii, Codul administrativ, Codul vamal, Codul consumului, Codul aerian, Codul silvic și Codul comercial din 1887;
+- **abrogate, păstrate pentru istoricul lor:** Codul civil din 1864, Codul de procedură civilă din 1865, Codul penal din 1968, Codul de procedură penală din 1968, Codul familiei din 1953 și Codul fiscal din 2003;
+- **neconsolidat în sursă:** Codul silvic din 1962.
+
+Celelalte legi, ordonanțele și hotărârile nu sunt încă incluse. Un act care a modificat un cod are o pagină cu ce a schimbat, dar textul lui nu este reprodus aici.
 
 ### Adrese
 
@@ -56,7 +66,7 @@ Orice pagină are o adresă stabilă, pe care o poți cita sau trimite mai depar
 | `/jurisprudenta/ccr/2016/405` | o decizie și articolele pe care le privește |
 | `/lege/2011/71` | un act modificator și tot ce a schimbat |
 
-În căutare poți scrie o trimitere așa cum apare într-un document, de exemplu `art. 1112 Codul civil`, `art. 52^1 C. pen.` sau `Legea 31/1990`, și ajungi direct la articol. Orice alt text se caută în legislația în vigoare.
+În căutare poți scrie o trimitere așa cum apare într-un document, de exemplu `art. 1112 Codul civil`, `art. 52^1 C. pen.` sau `art. 52 Codul muncii`, și ajungi direct la articol. Orice alt text se caută în legislația în vigoare.
 
 Site-ul funcționează și fără JavaScript. Este gratuit, nu cere cont și nu urmărește vizitatorii.
 
@@ -87,7 +97,7 @@ Textele legilor și ale deciziilor nu sunt protejate de dreptul de autor (Legea 
 
 The text of a law you find online is almost always today's text. It does not tell you since when it applies or what it said before. If you need an article as it stood on a given day, such as the day you signed a contract, you have to replay the amendments yourself, one by one.
 
-Textdelege shows every article of the Constitution and of the 20 codes, current and repealed, in all of its versions:
+Textdelege shows every article of the Constitution and of 20 codes, in all of its versions:
 
 - pick a day and read the text that applied then;
 - put two versions side by side and see, word by word, what changed;
@@ -95,6 +105,16 @@ Textdelege shows every article of the Constitution and of the 20 codes, current 
 - find the Constitutional Court and High Court decisions on the article beside it.
 
 The texts come from [lexifina/romania-law](https://github.com/lexifina/romania-law), a public repository in which every article is a file and every amendment is a commit dated on the day it took effect. Textdelege adds no legal text of its own. It displays those files, states the revision each text comes from and links the official page on legislatie.just.ro.
+
+### What it contains
+
+For now only the Constitution and the codes:
+
+- **in force:** the Civil Code, Penal Code, Civil Procedure Code, Criminal Procedure Code, Fiscal Code, Fiscal Procedure Code, Labour Code, Administrative Code, Customs Code, Consumer Code, Aviation Code, Forestry Code and the Commercial Code of 1887;
+- **repealed, kept for their history:** the Civil Code of 1864, Civil Procedure Code of 1865, Penal Code of 1968, Criminal Procedure Code of 1968, Family Code of 1953 and Fiscal Code of 2003;
+- **not consolidated in the source:** the Forestry Code of 1962.
+
+Other laws, ordinances and decisions are not included yet. An act that amended a code has a page listing what it changed, but its own text is not reproduced here.
 
 ### Addresses
 
@@ -113,7 +133,7 @@ Every page has a stable address you can cite or share.
 | `/jurisprudenta/ccr/2016/405` | a decision and the articles it concerns |
 | `/lege/2011/71` | an amending act and everything it changed |
 
-The search field takes a reference written the way it appears in a document, such as `art. 1112 Codul civil`, `art. 52^1 C. pen.` or `Legea 31/1990`, and goes straight to the article. Any other text is searched in the legislation in force.
+The search field takes a reference written the way it appears in a document, such as `art. 1112 Codul civil`, `art. 52^1 C. pen.` or `art. 52 Codul muncii`, and goes straight to the article. Any other text is searched in the legislation in force.
 
 The site works without JavaScript. It is free, needs no account and does not track visitors.
 

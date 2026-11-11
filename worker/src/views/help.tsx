@@ -93,6 +93,10 @@ export function renderAbout() {
           ))}
         </dl>
       </Section>
+      <Section id="continut" title={t("aboutScopeHeading")}>
+        {linked("aboutScopeText", "aboutScopeLink", "/#coduri")}
+        {text("aboutScopeOther")}
+      </Section>
       <Section id="limitari" title={t("aboutLimitsHeading")}>
         {text("aboutLimitsUnofficial")}
         {text("aboutLimitsAmended")}

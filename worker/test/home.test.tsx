@@ -54,7 +54,7 @@ describe("home", () => {
       "art. 194 Codul de procedură civilă",
       "art. 83 Codul de procedură penală",
       "art. 5 Codul administrativ",
-      "Legea 31/1990",
+      "art. 1 Codul vamal",
     ];
     const seen = new Set<string>();
     for (let visit = 0; visit < 12; visit++) {
