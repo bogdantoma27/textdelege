@@ -589,7 +589,7 @@ del .vh,ins .vh{user-select:none}
 .home-strip div{display:flex;flex-direction:column-reverse;justify-content:flex-end;padding:14px 0;border-top:1px solid var(--border-strong);font-size:calc(14px*var(--k));line-height:20px;color:var(--secondary)}
 .home-strip dt{margin:0}
 .home-strip dd{margin:0 0 2px;font-family:var(--serif);font-size:calc(30px*var(--k));line-height:36px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
-.home .solo>section,.home .solo>.home-row{margin-top:56px}
+.home .solo>section,.home .solo>.home-row,.home .solo>.home-changes{margin-top:56px}
 .home .solo>.home-hero{margin-top:0}
 .home #coduri .tabs{margin-top:-8px;border-bottom:0}
 .home #coduri .tabs-panel{padding-top:16px}
@@ -731,7 +731,7 @@ mark{background:var(--accent-tint);color:var(--text);padding:0 1px}
   .home-hero .lede{font-size:calc(17px*var(--k));line-height:27px}
   .home-strip{gap:0 16px}
   .home-strip dd{font-size:calc(24px*var(--k));line-height:30px}
-  .home .solo>section,.home .solo>.home-row{margin-top:40px}
+  .home .solo>section,.home .solo>.home-row,.home .solo>.home-changes{margin-top:40px}
   .home .solo>.home-hero{margin-top:0}
   html{scroll-padding-top:16px}
   .doc-main{grid-column:1}
