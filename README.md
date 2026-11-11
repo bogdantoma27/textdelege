@@ -30,7 +30,7 @@
 
 Textul unei legi pe care îl găsești pe internet este aproape mereu cel de azi. Din el nu afli de când se aplică și nici cum arăta înainte. Dacă ai nevoie de forma unui articol la o anumită dată, de exemplu ziua în care ai semnat un contract, trebuie să refaci singur modificările, una câte una.
 
-Textdelege arată fiecare articol din Constituție și din cele 21 de coduri în toate versiunile lui:
+Textdelege arată fiecare articol din Constituție și din cele 20 de coduri, actuale și abrogate, în toate versiunile lui:
 
 - alegi o zi și citești textul care se aplica atunci;
 - pui două versiuni una lângă alta și vezi, cuvânt cu cuvânt, ce s-a schimbat;
@@ -87,7 +87,7 @@ Textele legilor și ale deciziilor nu sunt protejate de dreptul de autor (Legea 
 
 The text of a law you find online is almost always today's text. It does not tell you since when it applies or what it said before. If you need an article as it stood on a given day, such as the day you signed a contract, you have to replay the amendments yourself, one by one.
 
-Textdelege shows every article of the Constitution and of the 21 codes in all of its versions:
+Textdelege shows every article of the Constitution and of the 20 codes, current and repealed, in all of its versions:
 
 - pick a day and read the text that applied then;
 - put two versions side by side and see, word by word, what changed;
