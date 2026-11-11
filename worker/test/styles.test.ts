@@ -673,11 +673,11 @@ describe("styles.css", () => {
   });
 
   it("draws the side columns' scrollbar thin and without buttons, keeping the WebKit styles alive in Chrome", () => {
-    expect(block(".with-contents .shell>.toc-sheet .toc-list,.with-contents .shell>.rail")).toBe(".with-contents .shell>.toc-sheet .toc-list,.with-contents .shell>.rail{scrollbar-gutter:stable");
+    expect(block(".with-contents .shell>.toc-sheet .toc-list,.with-contents .shell>.rail,.rail .ruling-list")).toBe(".with-contents .shell>.toc-sheet .toc-list,.with-contents .shell>.rail,.rail .ruling-list{scrollbar-gutter:stable");
     expect(block(".with-contents .shell>.toc-sheet .toc-list")).toContain("flex:1 1 auto;min-height:0;padding:0 16px 8px 0;border-bottom:1px solid var(--border);overflow:auto");
     expect(css).toContain(".with-contents .shell>.toc-sheet{display:flex;position:sticky;top:calc(var(--head) + 32px);max-height:calc(100vh - var(--head) - 64px);padding:0;overflow:clip}");
     expect(css).toContain("::-webkit-scrollbar-button{display:none;width:0;height:0}");
-    expect(css).toContain("@supports not selector(::-webkit-scrollbar){.with-contents .shell>.toc-sheet .toc-list,.with-contents .shell>.rail{scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}}");
+    expect(css).toContain("@supports not selector(::-webkit-scrollbar){.with-contents .shell>.toc-sheet .toc-list,.with-contents .shell>.rail,.rail .ruling-list{scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}}");
   });
 
   it("fills the open article of the contents with the brand colour and marks its number in gold", () => {
