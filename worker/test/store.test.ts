@@ -84,6 +84,12 @@ describe("store", () => {
     });
   });
 
+  it("search matches the last word as a prefix, so results stay while a word is typed", async () => {
+    const store = createStore(env);
+    expect(await store.searchCount("doil", true)).toBe(await store.searchCount("doilea", true));
+    expect(await store.searchCount("doilea", true)).toBe(2);
+  });
+
   it("search finds a title match and marks it in the snippet", async () => {
     const store = createStore(env);
     const hits = await store.search("titlu", true, 10);

@@ -648,7 +648,7 @@ describe("styles.css", () => {
     expect(block(".p .who")).toContain("font-family:var(--font);font-size:14px");
     expect(css).toContain(".attr .p .who,.hl .p.last .who{display:flex}");
     expect(css).toContain(".attr .p .who .by{display:flex}");
-    expect(css).toContain("[id]{scroll-margin-top:calc(var(--head) + 16px)}");
+    expect(css).toContain(":is([id],a,button,input,select,textarea,summary){scroll-margin-top:calc(var(--head) + 16px)}");
     expect(block(".law.flow .p")).toContain("border-left:0");
     expect(css).toContain(".cmp .p.changed,.cmp .p.added,.cmp .p.removed,.pair .cell.changed .p,.pair .cell.added .p,.pair .cell.removed .p{border-left-color:var(--accent)}");
   });
@@ -776,7 +776,9 @@ describe("styles.css", () => {
   });
 
   it("keeps fixed buttons and bars from covering what the reader reaches", () => {
-    expect(block("html")).toContain("scroll-padding-top:calc(var(--head) + 16px);scroll-padding-bottom:136px");
+    expect(block("html")).toContain("scrollbar-gutter:stable;scroll-padding-bottom:136px");
+    expect(block("html")).not.toContain("scroll-padding-top");
+    expect(block(".header-bar :is([id],a,button,input,select,textarea,summary)")).toContain("scroll-margin-top:0");
     expect(phone).toContain("html{scroll-padding-top:16px}");
     expect(narrow).toContain(".js .with-contents :is(.to-top,.to-bottom){bottom:calc(var(--bar) + env(safe-area-inset-bottom) + 24px)}");
     expect(phone).toContain(".js :is(.to-top,.to-bottom){right:16px;bottom:16px}");

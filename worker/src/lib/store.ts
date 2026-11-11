@@ -50,7 +50,7 @@ function toMatchQuery(q: string): string {
   return q
     .split(/[^\p{L}\p{N}]+/u)
     .filter((token) => token !== "")
-    .map((token) => `"${token}"`)
+    .map((token, index, tokens) => (index === tokens.length - 1 ? `"${token}"*` : `"${token}"`))
     .join(" ");
 }
 

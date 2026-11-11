@@ -198,6 +198,7 @@ function initLiveSearch() {
         hide();
         return;
       }
+      if (query === shown && !box.hidden) return;
       const cached = cache.get(query);
       if (cached) {
         controller?.abort();
