@@ -1,0 +1,47 @@
+{
+  "schema": "textdelege/manifest/1",
+  "build": "20261108T060000Z-cd6b8ad",
+  "source_head": "cd6b8ad1c13b1486b52e60833ff407e2836b9a67",
+  "generated": "2026-11-08T06:00:00Z",
+  "counts": {
+    "acts": 2,
+    "articles": 3,
+    "versions": 4,
+    "laws": 2,
+    "rulings": 1
+  },
+  "acts": [
+    {
+      "path": "lege/2009/287",
+      "alias": "codul-civil",
+      "title": "Legea nr. 287/2009",
+      "short": "Codul civil",
+      "status": "in force",
+      "latest": "2023-07-09",
+      "from": "2011-10-01",
+      "articles": 2,
+      "versions": 3,
+      "freshness_status": "current"
+    },
+    {
+      "path": "lege/2010/134",
+      "alias": "codul-procedura",
+      "title": "Legea nr. 134/2010",
+      "short": "Codul de procedura",
+      "status": "in force",
+      "latest": "2023-07-09",
+      "from": "2011-10-01",
+      "articles": 1,
+      "versions": 1,
+      "freshness_status": null
+    }
+  ],
+  "freshness": {
+    "as_of": "2026-11-01",
+    "checked_against_official_source": "2026-11-01"
+  },
+  "status": {
+    "schema": "romania-law-status/1",
+    "generated": "2026-11-01T00:00:00Z"
+  }
+}

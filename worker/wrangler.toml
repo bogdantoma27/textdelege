@@ -1,0 +1,26 @@
+name = "textdelege"
+main = "src/index.ts"
+compatibility_date = "2026-11-04"
+compatibility_flags = ["nodejs_als"]
+workers_dev = false
+preview_urls = false
+routes = [
+  { pattern = "textdelege.ro", custom_domain = true },
+  { pattern = "www.textdelege.ro", custom_domain = true },
+]
+
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
+[assets]
+directory = "public"
+binding = "ASSETS"
+
+[[r2_buckets]]
+binding = "DATA"
+bucket_name = "textdelege-data"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "textdelege"
+database_id = "eda50812-ef65-40a5-8b7f-b83d3aa6ed50"

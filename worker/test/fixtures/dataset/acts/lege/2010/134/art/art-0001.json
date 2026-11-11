@@ -1,0 +1,54 @@
+{
+  "schema": "textdelege/article/1",
+  "act": {
+    "path": "lege/2010/134",
+    "alias": "codul-procedura",
+    "title": "Legea nr. 134/2010",
+    "short": "Codul de procedura",
+    "kind": "lege"
+  },
+  "file": "art-0001",
+  "number": "1",
+  "title": null,
+  "state": "in-force",
+  "repealed": null,
+  "versions": [
+    {
+      "from": "2011-10-01",
+      "until": null,
+      "commit": "4633e3daa158e5c50641a2d42999b164f36615b5",
+      "path": "lege/2010/134/art-0001.md",
+      "law_commit": "4633e3daa158e5c50641a2d42999b164f36615b5",
+      "law": {
+        "key": "legea-71-2011",
+        "label": "Legea nr. 71/2011"
+      },
+      "kind": "amendment",
+      "lines": [
+        {
+          "id": "p-1",
+          "text": "Procedura.",
+          "since": "2011-10-01",
+          "law": "legea-71-2011"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "date": "2011-10-01",
+      "verb": "entered",
+      "units": [],
+      "law": {
+        "key": "legea-71-2011",
+        "label": "Legea nr. 71/2011"
+      },
+      "kind": "amendment",
+      "from_version": null,
+      "to_version": 0
+    }
+  ],
+  "rulings": [],
+  "prev": null,
+  "next": null
+}

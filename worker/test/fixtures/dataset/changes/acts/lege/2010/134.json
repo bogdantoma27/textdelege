@@ -1,0 +1,20 @@
+{
+  "schema": "textdelege/changes/1",
+  "scope": "lege/2010/134",
+  "items": [
+    {
+      "date": "2011-10-01",
+      "act_path": "lege/2010/134",
+      "file": "art-0001",
+      "number": "1",
+      "title": null,
+      "verb": "entered",
+      "units": [],
+      "law": {
+        "key": "legea-71-2011",
+        "label": "Legea nr. 71/2011"
+      }
+    }
+  ],
+  "upcoming": []
+}

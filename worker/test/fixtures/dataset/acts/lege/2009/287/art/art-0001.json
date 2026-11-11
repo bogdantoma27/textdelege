@@ -1,0 +1,114 @@
+{
+  "schema": "textdelege/article/1",
+  "act": {
+    "path": "lege/2009/287",
+    "alias": "codul-civil",
+    "title": "Legea nr. 287/2009",
+    "short": "Codul civil",
+    "kind": "lege"
+  },
+  "file": "art-0001",
+  "number": "1",
+  "title": "Titlu",
+  "state": "in-force",
+  "repealed": null,
+  "versions": [
+    {
+      "from": "2011-10-01",
+      "until": "2023-07-08",
+      "commit": "4633e3daa158e5c50641a2d42999b164f36615b5",
+      "path": "lege/2009/287/art-0001.md",
+      "law_commit": "4633e3daa158e5c50641a2d42999b164f36615b5",
+      "law": {
+        "key": "legea-71-2011",
+        "label": "Legea nr. 71/2011"
+      },
+      "kind": "amendment",
+      "lines": [
+        {
+          "id": "alin-1",
+          "text": "(1) Primul text.",
+          "since": "2011-10-01",
+          "law": "legea-71-2011"
+        },
+        {
+          "id": "alin-2",
+          "text": "(2) Al doilea text.",
+          "since": "2011-10-01",
+          "law": "legea-71-2011"
+        }
+      ]
+    },
+    {
+      "from": "2023-07-09",
+      "until": null,
+      "commit": "dd8ba34cb925b4cea72b8d468e26f6adbac9bdf4",
+      "path": "lege/2009/287/art-0001.md",
+      "law_commit": "dd8ba34cb925b4cea72b8d468e26f6adbac9bdf4",
+      "law": {
+        "key": "legea-200-2023",
+        "label": "Legea nr. 200/2023"
+      },
+      "kind": "amendment",
+      "lines": [
+        {
+          "id": "alin-1",
+          "text": "(1) Primul text modificat.",
+          "since": "2023-07-09",
+          "law": "legea-200-2023"
+        },
+        {
+          "id": "alin-2",
+          "text": "(2) Al doilea text.",
+          "since": "2011-10-01",
+          "law": "legea-71-2011"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "date": "2023-07-09",
+      "verb": "modified",
+      "units": [
+        "alin-1"
+      ],
+      "law": {
+        "key": "legea-200-2023",
+        "label": "Legea nr. 200/2023"
+      },
+      "kind": "amendment",
+      "from_version": 0,
+      "to_version": 1
+    },
+    {
+      "date": "2011-10-01",
+      "verb": "entered",
+      "units": [],
+      "law": {
+        "key": "legea-71-2011",
+        "label": "Legea nr. 71/2011"
+      },
+      "kind": "amendment",
+      "from_version": null,
+      "to_version": 0
+    }
+  ],
+  "rulings": [
+    {
+      "key": "dcc-1-2019",
+      "label": "CCR 1/2019",
+      "court": "ccr",
+      "date": "2019-02-01",
+      "outcome": "admis",
+      "finds_unconstitutional": true
+    }
+  ],
+  "prev": null,
+  "next": {
+    "file": "art-0002",
+    "number": "2",
+    "title": null,
+    "state": "in-force"
+  }
+}

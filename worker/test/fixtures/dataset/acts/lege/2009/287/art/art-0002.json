@@ -1,0 +1,59 @@
+{
+  "schema": "textdelege/article/1",
+  "act": {
+    "path": "lege/2009/287",
+    "alias": "codul-civil",
+    "title": "Legea nr. 287/2009",
+    "short": "Codul civil",
+    "kind": "lege"
+  },
+  "file": "art-0002",
+  "number": "2",
+  "title": null,
+  "state": "in-force",
+  "repealed": null,
+  "versions": [
+    {
+      "from": "2011-10-01",
+      "until": null,
+      "commit": "4633e3daa158e5c50641a2d42999b164f36615b5",
+      "path": "lege/2009/287/art-0002.md",
+      "law_commit": "4633e3daa158e5c50641a2d42999b164f36615b5",
+      "law": {
+        "key": "legea-71-2011",
+        "label": "Legea nr. 71/2011"
+      },
+      "kind": "amendment",
+      "lines": [
+        {
+          "id": "p-1",
+          "text": "Al doilea articol.",
+          "since": "2011-10-01",
+          "law": "legea-71-2011"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "date": "2011-10-01",
+      "verb": "entered",
+      "units": [],
+      "law": {
+        "key": "legea-71-2011",
+        "label": "Legea nr. 71/2011"
+      },
+      "kind": "amendment",
+      "from_version": null,
+      "to_version": 0
+    }
+  ],
+  "rulings": [],
+  "prev": {
+    "file": "art-0001",
+    "number": "1",
+    "title": "Titlu",
+    "state": "in-force"
+  },
+  "next": null
+}

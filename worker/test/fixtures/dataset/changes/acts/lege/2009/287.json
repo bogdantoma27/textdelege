@@ -1,0 +1,48 @@
+{
+  "schema": "textdelege/changes/1",
+  "scope": "lege/2009/287",
+  "items": [
+    {
+      "date": "2023-07-09",
+      "act_path": "lege/2009/287",
+      "file": "art-0001",
+      "number": "1",
+      "title": "Titlu",
+      "verb": "modified",
+      "units": [
+        "alin-1"
+      ],
+      "law": {
+        "key": "legea-200-2023",
+        "label": "Legea nr. 200/2023"
+      }
+    },
+    {
+      "date": "2011-10-01",
+      "act_path": "lege/2009/287",
+      "file": "art-0001",
+      "number": "1",
+      "title": "Titlu",
+      "verb": "entered",
+      "units": [],
+      "law": {
+        "key": "legea-71-2011",
+        "label": "Legea nr. 71/2011"
+      }
+    },
+    {
+      "date": "2011-10-01",
+      "act_path": "lege/2009/287",
+      "file": "art-0002",
+      "number": "2",
+      "title": null,
+      "verb": "entered",
+      "units": [],
+      "law": {
+        "key": "legea-71-2011",
+        "label": "Legea nr. 71/2011"
+      }
+    }
+  ],
+  "upcoming": []
+}

@@ -1,0 +1,471 @@
+[
+  {
+    "schema": "textdelege/article/1",
+    "act": {
+      "path": "lege/2009/287",
+      "alias": "codul-civil",
+      "title": "Legea nr. 287/2009 privind Codul civil",
+      "short": "Codul civil",
+      "kind": "lege"
+    },
+    "file": "art-1112",
+    "number": "1112",
+    "title": "Ofertă",
+    "state": "in-force",
+    "repealed": null,
+    "versions": [
+      {
+        "from": "2011-10-01",
+        "until": "2023-07-08",
+        "commit": "1111111111111111111111111111111111111111",
+        "path": "constitutia/art-1112.md",
+        "law_commit": "2222222222222222222222222222222222222222",
+        "law": {
+          "key": "legea-71-2011",
+          "label": "Legea nr. 71/2011"
+        },
+        "kind": "law",
+        "lines": [
+          {
+            "id": "alin-1",
+            "text": "(1) Primul text.",
+            "since": "2011-10-01",
+            "law": "legea-71-2011"
+          },
+          {
+            "id": "alin-2",
+            "text": "(2) Al doilea text.",
+            "since": "2011-10-01",
+            "law": "legea-71-2011"
+          }
+        ]
+      },
+      {
+        "from": "2023-07-09",
+        "until": null,
+        "commit": "3333333333333333333333333333333333333333",
+        "path": "constitutie/1991/art-1112.md",
+        "law_commit": "4444444444444444444444444444444444444444",
+        "law": {
+          "key": "legea-200-2023",
+          "label": "Legea nr. 200/2023"
+        },
+        "kind": "law",
+        "lines": [
+          {
+            "id": "alin-1",
+            "text": "(1) Primul text modificat.",
+            "since": "2023-07-09",
+            "law": "legea-200-2023"
+          },
+          {
+            "id": "alin-2",
+            "text": "(2) Al doilea text.",
+            "since": "2011-10-01",
+            "law": "legea-71-2011"
+          }
+        ]
+      }
+    ],
+    "events": [
+      {
+        "date": "2023-07-09",
+        "verb": "modified",
+        "units": [
+          "alin-1"
+        ],
+        "law": {
+          "key": "legea-200-2023",
+          "label": "Legea nr. 200/2023"
+        },
+        "kind": "law",
+        "from_version": 0,
+        "to_version": 1
+      },
+      {
+        "date": "2011-10-01",
+        "verb": "entered",
+        "units": [],
+        "law": {
+          "key": "legea-71-2011",
+          "label": "Legea nr. 71/2011"
+        },
+        "kind": "law",
+        "from_version": null,
+        "to_version": 0
+      }
+    ],
+    "rulings": [
+      {
+        "key": "ccr-1-2020",
+        "label": "Decizia CCR nr. 1/2020",
+        "court": "ccr",
+        "date": "2020-01-15",
+        "outcome": "respinge",
+        "finds_unconstitutional": false
+      }
+    ],
+    "prev": {
+      "file": "art-1111",
+      "number": "1111",
+      "title": "Condiții",
+      "state": "in-force"
+    },
+    "next": {
+      "file": "art-1113",
+      "number": "1113",
+      "title": "Acceptare",
+      "state": "in-force"
+    }
+  },
+  {
+    "schema": "textdelege/article/1",
+    "act": {
+      "path": "lege/2009/287",
+      "alias": "codul-civil",
+      "title": "Legea nr. 287/2009 privind Codul civil",
+      "short": "Codul civil",
+      "kind": "lege"
+    },
+    "file": "art-5",
+    "number": "5",
+    "title": null,
+    "state": "repealed",
+    "repealed": {
+      "on": "2020-01-01",
+      "law": {
+        "key": "legea-200-2023",
+        "label": "Legea nr. 200/2023"
+      }
+    },
+    "versions": [
+      {
+        "from": "2012-01-01",
+        "until": "2019-12-31",
+        "commit": "1111111111111111111111111111111111111111",
+        "path": "constitutie/1991/art-1112.md",
+        "law_commit": "2222222222222222222222222222222222222222",
+        "law": {
+          "key": "legea-71-2011",
+          "label": "Legea nr. 71/2011"
+        },
+        "kind": "law",
+        "lines": [
+          {
+            "id": "alin-1",
+            "text": "(1) Text.",
+            "since": "2012-01-01",
+            "law": "legea-71-2011"
+          }
+        ]
+      }
+    ],
+    "events": [
+      {
+        "date": "2020-01-01",
+        "verb": "repealed",
+        "units": [],
+        "law": {
+          "key": "legea-200-2023",
+          "label": "Legea nr. 200/2023"
+        },
+        "kind": "",
+        "from_version": 0,
+        "to_version": -1
+      },
+      {
+        "date": "2012-01-01",
+        "verb": "entered",
+        "units": [],
+        "law": {
+          "key": "legea-71-2011",
+          "label": "Legea nr. 71/2011"
+        },
+        "kind": "law",
+        "from_version": null,
+        "to_version": 0
+      }
+    ],
+    "rulings": [
+      {
+        "key": "ccr-1-2020",
+        "label": "Decizia CCR nr. 1/2020",
+        "court": "ccr",
+        "date": "2020-01-15",
+        "outcome": "respinge",
+        "finds_unconstitutional": false
+      }
+    ],
+    "prev": {
+      "file": "art-4",
+      "number": "4",
+      "title": null,
+      "state": "in-force"
+    },
+    "next": {
+      "file": "art-6",
+      "number": "6",
+      "title": "Titlu",
+      "state": "in-force"
+    }
+  },
+  {
+    "schema": "textdelege/act/1",
+    "path": "lege/2009/287",
+    "slug": "codul-civil",
+    "alias": "codul-civil",
+    "kind": "lege",
+    "year": 2009,
+    "number": "287",
+    "title": "Legea nr. 287/2009 privind Codul civil",
+    "short": "Codul civil",
+    "code": "civil",
+    "status": "in force",
+    "portal": "https://legislatie.just.ro/Public/DetaliiDocument/109884",
+    "from": "2011-10-01",
+    "latest": "2023-07-09",
+    "freshness": {
+      "status": "stale",
+      "last_verified": "2026-06-25",
+      "check_due": "2026-07-02",
+      "method": "consolidated-form",
+      "newest_change": "legea-57-2026",
+      "newest_change_date": "2026-05-03",
+      "change_in_repo": true,
+      "official_url": "https://legislatie.just.ro/Public/DetaliiDocument/109884"
+    },
+    "articles": [
+      {
+        "file": "art-1112",
+        "number": "1112",
+        "title": "Ofertă",
+        "lead": null,
+        "state": "in-force",
+        "versions": 2,
+        "changes": 1,
+        "first": "2011-10-01",
+        "last_change": "2023-07-09"
+      }
+    ],
+    "timeline": [
+      {
+        "date": "2011-10-01",
+        "laws": [
+          {
+            "key": "legea-71-2011",
+            "label": "Legea nr. 71/2011"
+          }
+        ],
+        "articles": 1
+      },
+      {
+        "date": "2023-07-09",
+        "laws": [
+          {
+            "key": "legea-200-2023",
+            "label": "Legea nr. 200/2023"
+          }
+        ],
+        "articles": 1
+      }
+    ],
+    "stats": {
+      "changes_per_year": {
+        "2023": 1
+      },
+      "most_amended": [
+        {
+          "file": "art-1112",
+          "number": "1112",
+          "title": "Ofertă",
+          "changes": 1
+        }
+      ]
+    },
+    "rulings": [
+      {
+        "key": "ccr-1-2020",
+        "label": "Decizia CCR nr. 1/2020",
+        "court": "ccr",
+        "date": "2020-01-15",
+        "outcome": "respinge",
+        "finds_unconstitutional": false
+      }
+    ],
+    "laws": [
+      {
+        "key": "legea-200-2023",
+        "label": "Legea nr. 200/2023"
+      },
+      {
+        "key": "legea-71-2011",
+        "label": "Legea nr. 71/2011"
+      }
+    ]
+  },
+  {
+    "schema": "textdelege/law/1",
+    "key": "legea-200-2023",
+    "label": "Legea nr. 200/2023",
+    "kind": "law",
+    "title": "Legea nr. 200 din 5 iulie 2023, publicată în Monitorul Oficial al României, Partea I, nr. 616 din 6 iulie 2023",
+    "enacted": "2023-07-05",
+    "published": "2023-07-06",
+    "in_force": [
+      "2023-07-09"
+    ],
+    "source": "https://legislatie.just.ro/Public/DetaliiDocument/271902",
+    "mo": "Monitorul Oficial al României, Partea I, nr. 616 din 6 iulie 2023",
+    "changes": [
+      {
+        "act_path": "lege/2009/287",
+        "file": "art-1112",
+        "number": "1112",
+        "verb": "modified",
+        "units": [
+          "alin-1"
+        ],
+        "date": "2023-07-09"
+      }
+    ]
+  },
+  {
+    "schema": "textdelege/ruling/1",
+    "key": "ccr-1-2020",
+    "label": "Decizia CCR nr. 1/2020",
+    "court": "ccr",
+    "court_name": "Curtea Constituțională",
+    "kind": "decision",
+    "heading": "Decizia nr. 1 din 15 ianuarie 2020",
+    "subtitle": "Subtitlu",
+    "date": "2020-01-15",
+    "binding_from": "2020-03-01",
+    "mo": {
+      "number": 250,
+      "bis": false,
+      "date": "2020-03-01",
+      "part": 1
+    },
+    "outcome": "respinge",
+    "finds_unconstitutional": false,
+    "dossiers": [
+      "123D/2019"
+    ],
+    "operative": [
+      "Respinge excepția."
+    ],
+    "text": "Text integral.",
+    "subjects": [
+      {
+        "act_path": "lege/2009/287",
+        "articles": [
+          "1112"
+        ]
+      }
+    ],
+    "source": "https://www.ccr.ro/decizia-1-2020",
+    "folder": "ccr/2020/1",
+    "articles": [
+      {
+        "act_path": "lege/2009/287",
+        "file": "art-1112"
+      }
+    ]
+  },
+  {
+    "schema": "textdelege/changes/1",
+    "scope": "lege/2009/287",
+    "items": [
+      {
+        "date": "2023-07-09",
+        "act_path": "lege/2009/287",
+        "file": "art-1112",
+        "number": "1112",
+        "title": "Ofertă",
+        "verb": "modified",
+        "units": [
+          "alin-1"
+        ],
+        "law": {
+          "key": "legea-200-2023",
+          "label": "Legea nr. 200/2023"
+        }
+      }
+    ],
+    "upcoming": [
+      {
+        "date": "2027-01-01",
+        "act_path": "lege/2009/287",
+        "file": "art-1113",
+        "number": "1113",
+        "title": "Acceptare",
+        "verb": "modified",
+        "units": [
+          "alin-2"
+        ],
+        "law": {
+          "key": "legea-57-2026",
+          "label": "Legea nr. 57/2026"
+        }
+      }
+    ]
+  },
+  {
+    "schema": "textdelege/manifest/1",
+    "build": "20261108T060000Z-5555555",
+    "source_head": "5555555555555555555555555555555555555555",
+    "generated": "2026-11-08T06:00:00Z",
+    "counts": {
+      "acts": 1,
+      "articles": 1,
+      "versions": 2,
+      "laws": 2,
+      "rulings": 1
+    },
+    "acts": [
+      {
+        "path": "lege/2009/287",
+        "alias": "codul-civil",
+        "title": "Legea nr. 287/2009 privind Codul civil",
+        "short": "Codul civil",
+        "status": "in force",
+        "from": "2011-10-01",
+        "latest": "2023-07-09",
+        "articles": 1,
+        "versions": 2,
+        "freshness_status": "stale"
+      }
+    ],
+    "freshness": {
+      "as_of": "2026-11-08",
+      "checked_against_official_source": "2026-11-08"
+    },
+    "status": {
+      "schema": "romania-law-status/1",
+      "generated": "2026-11-08T09:20:27Z",
+      "updates": "running",
+      "last_published": "2026-11-08T09:11:14Z",
+      "published_last_24h": {
+        "commits": 44527,
+        "new_acts": 44527
+      },
+      "official_sources": [
+        {
+          "name": "Portal legislativ: web service (legislatie.just.ro)",
+          "state": "unavailable",
+          "unavailable_since": "2026-11-08T08:52:13Z",
+          "last_successful_contact": "2026-11-08T08:52:10Z",
+          "as_of": "2026-11-08T08:56:56Z"
+        },
+        {
+          "name": "EU Publications Office (CELLAR)",
+          "state": "available",
+          "unavailable_since": null,
+          "last_successful_contact": "2026-11-06T02:14:25Z",
+          "as_of": "2026-11-06T02:14:25Z"
+        }
+      ],
+      "note": "Status of the update pipeline and of the official sources."
+    }
+  }
+]

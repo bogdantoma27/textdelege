@@ -1,0 +1,96 @@
+{
+  "schema": "textdelege/act/1",
+  "path": "lege/2009/287",
+  "slug": "codul-civil",
+  "alias": "codul-civil",
+  "kind": "lege",
+  "year": 2009,
+  "number": "287",
+  "title": "Legea nr. 287/2009",
+  "short": "Codul civil",
+  "code": "Codul civil",
+  "status": "in force",
+  "portal": "https://example.invalid/287",
+  "from": "2011-10-01",
+  "latest": "2023-07-09",
+  "freshness": {
+    "status": "current",
+    "last_verified": "2026-11-01",
+    "check_due": "2026-11-08",
+    "method": "consolidated-form",
+    "newest_change": null,
+    "newest_change_date": null,
+    "change_in_repo": false,
+    "official_url": null
+  },
+  "articles": [
+    {
+      "file": "art-0001",
+      "number": "1",
+      "title": "Titlu",
+      "lead": null,
+      "state": "in-force",
+      "versions": 2,
+      "changes": 1,
+      "first": "2011-10-01",
+      "last_change": "2023-07-09"
+    },
+    {
+      "file": "art-0002",
+      "number": "2",
+      "title": null,
+      "lead": "Al doilea articol.",
+      "state": "in-force",
+      "versions": 1,
+      "changes": 0,
+      "first": "2011-10-01",
+      "last_change": "2011-10-01"
+    }
+  ],
+  "timeline": [
+    {
+      "date": "2011-10-01",
+      "laws": [
+        {
+          "key": "legea-71-2011",
+          "label": "Legea nr. 71/2011"
+        }
+      ],
+      "articles": 2
+    },
+    {
+      "date": "2023-07-09",
+      "laws": [
+        {
+          "key": "legea-200-2023",
+          "label": "Legea nr. 200/2023"
+        }
+      ],
+      "articles": 1
+    }
+  ],
+  "stats": {
+    "changes_per_year": {
+      "2023": 1
+    },
+    "most_amended": [
+      {
+        "file": "art-0001",
+        "number": "1",
+        "title": "Titlu",
+        "changes": 1
+      }
+    ]
+  },
+  "rulings": [],
+  "laws": [
+    {
+      "key": "legea-200-2023",
+      "label": "Legea nr. 200/2023"
+    },
+    {
+      "key": "legea-71-2011",
+      "label": "Legea nr. 71/2011"
+    }
+  ]
+}

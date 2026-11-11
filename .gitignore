@@ -1,0 +1,7 @@
+.local/
+__pycache__/
+.venv/
+node_modules/
+.wrangler/
+.cache/
+.env*

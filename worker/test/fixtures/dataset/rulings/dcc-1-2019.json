@@ -1,0 +1,44 @@
+{
+  "schema": "textdelege/ruling/1",
+  "key": "dcc-1-2019",
+  "label": "CCR 1/2019",
+  "court": "ccr",
+  "court_name": "Curtea Constituțională",
+  "kind": "decizie",
+  "heading": "DECIZIE referitoare la art. 1112",
+  "subtitle": null,
+  "date": "2019-02-01",
+  "binding_from": "2020-03-01",
+  "mo": {
+    "number": 250,
+    "bis": false,
+    "date": "2020-03-01",
+    "part": 1
+  },
+  "outcome": "admis",
+  "finds_unconstitutional": true,
+  "dossiers": [
+    "123D/2019"
+  ],
+  "operative": [
+    "Admite excepția de neconstituționalitate.",
+    "Constată că art. 1112 este neconstituțional."
+  ],
+  "text": "DECIZIA nr. 1 din 2019\n",
+  "subjects": [
+    {
+      "act_path": "lege/2009/287",
+      "articles": [
+        "1"
+      ]
+    }
+  ],
+  "source": "https://example.invalid/1",
+  "folder": "jurisprudenta/ccr/2019/1",
+  "articles": [
+    {
+      "act_path": "lege/2009/287",
+      "file": "art-0001"
+    }
+  ]
+}

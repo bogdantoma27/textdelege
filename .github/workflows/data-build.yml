@@ -1,0 +1,71 @@
+name: Data build
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: data-build
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Restore cache
+        uses: actions/cache/restore@v4
+        with:
+          path: build/.cache
+          key: build-cache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            build-cache-${{ runner.os }}-
+      - name: Run the build
+        run: python -m build.textdelege.cli build
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      - name: Save cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: build/.cache
+          key: build-cache-${{ runner.os }}-${{ github.run_id }}
+
+  report-failures:
+    name: Report the failure
+    needs: build
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TITLE: Data build failed
+    steps:
+      - name: Open or update the issue
+        run: |
+          body=$(printf 'The data build failed: %s/%s/actions/runs/%s\n\nThe job summary of the run names the error. A failed publish is resumed by the next run from its last checkpoint.\n' \
+            "${{ github.server_url }}" "$GH_REPO" "${{ github.run_id }}")
+          existing=$(gh issue list --state open --search "\"$TITLE\" in:title" \
+            --json number,title --jq "[.[] | select(.title == env.TITLE)][0].number // empty")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$TITLE" --body "$body"
+          fi

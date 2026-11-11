@@ -1,0 +1,38 @@
+{
+  "schema": "textdelege/law/1",
+  "key": "legea-71-2011",
+  "label": "Legea nr. 71/2011",
+  "kind": "",
+  "title": "",
+  "enacted": null,
+  "published": null,
+  "in_force": [],
+  "source": null,
+  "mo": null,
+  "changes": [
+    {
+      "act_path": "lege/2009/287",
+      "file": "art-0001",
+      "number": "1",
+      "verb": "entered",
+      "units": [],
+      "date": "2011-10-01"
+    },
+    {
+      "act_path": "lege/2009/287",
+      "file": "art-0002",
+      "number": "2",
+      "verb": "entered",
+      "units": [],
+      "date": "2011-10-01"
+    },
+    {
+      "act_path": "lege/2010/134",
+      "file": "art-0001",
+      "number": "1",
+      "verb": "entered",
+      "units": [],
+      "date": "2011-10-01"
+    }
+  ]
+}

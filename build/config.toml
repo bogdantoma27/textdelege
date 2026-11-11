@@ -1,0 +1,14 @@
+source_url = "https://github.com/lexifina/romania-law"
+selection = "codes"
+cache_dir = ".cache"
+
+[r2]
+account_id_env = "R2_ACCOUNT_ID"
+bucket_env = "R2_BUCKET"
+access_key_id_env = "R2_ACCESS_KEY_ID"
+secret_access_key_env = "R2_SECRET_ACCESS_KEY"
+
+[d1]
+account_id_env = "CF_ACCOUNT_ID"
+database_id_env = "D1_DATABASE_ID"
+api_token_env = "CF_API_TOKEN"
