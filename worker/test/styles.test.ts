@@ -715,7 +715,8 @@ describe("styles.css", () => {
   it("opens the third column, the pinned rail and the contents beside the text only where the text keeps its measure", () => {
     const wide = media("(min-width:1360px)");
     expect(wide).toContain(".with-contents .shell{grid-template-columns:260px minmax(0,1fr) 300px;grid-template-rows:minmax(0,1fr) auto}");
-    expect(wide).toContain(".with-contents .shell>.rail{grid-column:3;grid-row:1/3;position:sticky;top:calc(var(--head) + 32px);max-height:calc(100vh - var(--head) - 64px);margin-top:0;padding-bottom:64px");
+    expect(wide).toContain(".with-contents .shell>.rail{grid-column:3;grid-row:1/3;position:sticky;top:calc(var(--head) + 32px);display:flex;flex-direction:column;max-height:calc(100vh - var(--head) - 64px);margin-top:0;overflow:auto");
+    expect(wide).toContain(".with-contents .shell>.rail>.panel:has(.ruling-list){display:flex;flex:0 1 auto;flex-direction:column;min-height:calc(32px + 2 * (2 * var(--xs-lh) + 17px))}");
     expect(css).not.toContain("232px");
     const rail = block(".with-contents .shell>.rail");
     expect(rail).toContain("grid-column:2;grid-row:2;margin-top:32px");
