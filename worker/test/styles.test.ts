@@ -646,7 +646,7 @@ describe("styles.css", () => {
     expect(block(".p .n")).toContain("font-family:var(--font)");
     for (let n = 1; n <= 8; n++) expect(css).toContain(`.attr .p.b${n}{border-left-color:var(--b${n})}`);
     expect(css).not.toMatch(/\n\.p\.b\d\{/);
-    expect(block(".hl .p.last")).toBe(".hl .p.last{border-left-color:var(--accent)");
+    expect(block(".hl .p.last")).toBe(".hl .p.last{border-left-color:var(--accent);background:var(--accent-tint);padding-top:8px;padding-bottom:8px;padding-right:12px");
     expect(block(".p .who")).toContain("font-family:var(--font);font-size:14px");
     expect(css).toContain(".attr .p .who,.hl .p.last .who{display:flex}");
     expect(css).toContain(".attr .p .who .by{display:flex}");

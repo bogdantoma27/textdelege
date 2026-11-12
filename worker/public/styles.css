@@ -407,9 +407,10 @@ table.data{width:100%;border-collapse:collapse;border-spacing:0;font-size:calc(1
 .attr .p .who .by{display:flex}
 .p .who a{color:var(--muted);text-decoration:none}
 .p .who a:hover{color:var(--brand)}
-.hl .p.last{border-left-color:var(--accent)}
-.p .here{display:none;color:var(--accent-text);font-weight:500;white-space:nowrap}
-.hl .p .here{display:inline}
+.hl .p.last{border-left-color:var(--accent);background:var(--accent-tint);padding-top:8px;padding-bottom:8px;padding-right:12px}
+.hl .p.last .n{top:calc(8px + .35em)}
+.p .who .here{display:none;padding:0 6px;border-radius:4px;background:var(--paper);color:var(--accent-text);font-weight:600;white-space:nowrap}
+.hl .p .who .here{display:inline}
 .law.flow .p{margin-left:0;border-left:0}
 del{background:var(--diff-del-bg);color:var(--diff-del);text-decoration:line-through;text-decoration-thickness:1.5px;padding:0 1px}
 ins{background:var(--diff-ins-bg);color:var(--diff-ins);text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:.12em;padding:0 1px}
