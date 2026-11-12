@@ -1,5 +1,8 @@
 import type { MiddlewareHandler } from "hono";
+import { normalise } from "./citation";
 import type {
+  ActIndex,
+  ActIndexEntry,
   ActObject,
   ArticleObject,
   ArticleRuling,
@@ -22,6 +25,7 @@ export type AppEnv = { Bindings: Env; Variables: { store: Store } };
 
 export interface Store {
   manifest(): Promise<Manifest>;
+  actIndex(): Promise<ActIndexEntry[]>;
   act(path: string): Promise<ActObject | null>;
   article(path: string, file: string): Promise<ArticleObject | null>;
   law(key: string): Promise<LawObject | null>;
@@ -33,7 +37,56 @@ export interface Store {
   sitemapEntries(limit: number, offset: number): Promise<SitemapEntry[]>;
   resolveAlias(alias: string): Promise<string | null>;
   actRulings(path: string): Promise<ArticleRuling[]>;
+  listActs(filter: ActFilter): Promise<ActList>;
 }
+
+export interface ActFilter {
+  kind?: string;
+  year?: number;
+  status?: "in-force" | "repealed";
+  q?: string;
+  page: number;
+}
+
+export interface ActListItem {
+  path: string;
+  alias: string | null;
+  kind: string;
+  title: string;
+  short: string | null;
+  status: string;
+  year: number | null;
+  number: string | null;
+  articles: number | null;
+}
+
+export interface ActList {
+  items: ActListItem[];
+  total: number;
+  over: boolean;
+  page: number;
+  pages: number;
+}
+
+export const ACTS_PAGE = 50;
+
+const FOLDED_LETTERS: [string, string][] = [
+  ["ăĂ", "a"],
+  ["âÂ", "a"],
+  ["îÎ", "i"],
+  ["șȘşŞ", "s"],
+  ["țȚţŢ", "t"],
+];
+
+function folded(column: string): string {
+  let expression = `lower(${column})`;
+  for (const [letters, plain] of FOLDED_LETTERS) {
+    for (const letter of letters) expression = `replace(${expression}, '${letter}', '${plain}')`;
+  }
+  return expression;
+}
+
+const FOLDED_NAME = `(${folded("coalesce(title, '')")} || ' ' || ${folded("coalesce(short, '')")})`;
 
 export const PREFIX_MIN = 4;
 export const COUNT_CAP = 1000;
@@ -45,6 +98,7 @@ export interface SitemapEntry {
 }
 
 const MANIFEST_KEY = "manifest.json";
+const INDEX_KEY = "acts/index.json";
 
 async function readJson<T>(bucket: R2Bucket, key: string): Promise<T | null> {
   const object = await bucket.get(key);
@@ -116,10 +170,33 @@ export function createStore(env: Env): Store {
     return manifestRead;
   };
 
+  let indexRead: Promise<ActIndexEntry[]> | undefined;
+
+  const actIndex = (): Promise<ActIndexEntry[]> => {
+    indexRead ??= manifest().then(async (current) => {
+      const found = await readJson<ActIndex>(env.DATA, INDEX_KEY);
+      return found !== null
+        ? found.acts
+        : current.acts.map((act) => ({
+            path: act.path,
+            alias: act.alias,
+            title: act.title,
+            short: act.short,
+            kind: act.path.split("/")[0] ?? "",
+            status: act.status,
+            from: act.from ?? null,
+            latest: act.latest,
+            articles: act.articles ?? 0,
+          }));
+    });
+    return indexRead;
+  };
+
   const readObject = <T>(key: string): Promise<T | null> => readJson<T>(env.DATA, key);
 
   return {
     manifest,
+    actIndex,
     act: (path) => readObject<ActObject>(`acts/${path}/act.json`),
     article: (path, file) => readObject<ArticleObject>(`acts/${path}/art/${file}.json`),
     law: (key) => readObject<LawObject>(`laws/${key}.json`),
@@ -226,8 +303,53 @@ export function createStore(env: Env): Store {
       }));
     },
 
+    async listActs(filter) {
+      const where: string[] = [];
+      const values: (string | number)[] = [];
+      if (filter.kind !== undefined) {
+        where.push("kind = ?");
+        values.push(filter.kind);
+      }
+      if (filter.year !== undefined) {
+        where.push("year = ?");
+        values.push(filter.year);
+      }
+      if (filter.status === "in-force") where.push("status = 'in force'");
+      if (filter.status === "repealed") where.push("status LIKE 'repealed%'");
+      const q = normalise(filter.q ?? "");
+      if (q !== "") {
+        const like = `%${q.replace(/[!%_]/g, "!$&")}%`;
+        if (/^[0-9]+$/.test(q)) {
+          where.push(`(number = ? OR ${FOLDED_NAME} LIKE ? ESCAPE '!')`);
+          values.push(q, like);
+        } else {
+          where.push(`${FOLDED_NAME} LIKE ? ESCAPE '!'`);
+          values.push(like);
+        }
+      }
+      const clause = where.length === 0 ? "" : `WHERE ${where.join(" AND ")}`;
+      const row = await env.DB.prepare(
+        `SELECT COUNT(*) AS total FROM (SELECT 1 FROM acts ${clause} LIMIT ${COUNT_CAP + 1})`,
+      )
+        .bind(...values)
+        .first<{ total: number }>();
+      const counted = row?.total ?? 0;
+      const total = Math.min(counted, COUNT_CAP);
+      const pages = Math.max(1, Math.ceil(total / ACTS_PAGE));
+      const page = Math.min(Math.max(1, Math.floor(filter.page)), pages);
+      const { results } = await env.DB.prepare(
+        `SELECT path, alias, kind, title, short, status, year, number, articles
+           FROM acts ${clause}
+          ORDER BY year DESC, CAST(number AS INTEGER) DESC, path
+          LIMIT ${ACTS_PAGE} OFFSET ?${values.length + 1}`,
+      )
+        .bind(...values, (page - 1) * ACTS_PAGE)
+        .all<ActListItem>();
+      return { items: results, total, over: counted > COUNT_CAP, page, pages };
+    },
+
     async resolveAlias(alias) {
-      const { acts } = await manifest();
+      const acts = await actIndex();
       return acts.find((act) => act.alias === alias)?.path ?? null;
     },
   };

@@ -1,9 +1,11 @@
 import { parseActStatus } from "./status";
 import type { ManifestAct } from "./types";
 
-export const actName = (act: ManifestAct) => act.short ?? act.title;
+export type OrderedAct = Pick<ManifestAct, "alias" | "title" | "short" | "status">;
 
-export const isCurrent = (act: ManifestAct) => parseActStatus(act.status).kind === "in-force";
+export const actName = (act: OrderedAct) => act.short ?? act.title;
+
+export const isCurrent = (act: OrderedAct) => parseActStatus(act.status).kind === "in-force";
 
 const PRIORITY = [
   "constitutia",
@@ -17,11 +19,11 @@ const PRIORITY = [
   "codul-administrativ",
 ];
 
-const priority = (act: ManifestAct) => {
+const priority = (act: OrderedAct) => {
   const index = act.alias ? PRIORITY.indexOf(act.alias) : -1;
   return index === -1 ? PRIORITY.length : index;
 };
 
-export function ordered(acts: ManifestAct[]): ManifestAct[] {
+export function ordered<T extends OrderedAct>(acts: T[]): T[] {
   return [...acts].sort((a, b) => priority(a) - priority(b) || actName(a).localeCompare(actName(b), "ro"));
 }

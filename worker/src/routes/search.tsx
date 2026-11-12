@@ -1,16 +1,16 @@
 import { Hono } from "hono";
 import { type Citation, citationUrl, parseCitation } from "../lib/citation";
 import { COUNT_CAP, type AppEnv, type Store } from "../lib/store";
-import type { Manifest } from "../lib/types";
+import type { ActIndexEntry } from "../lib/types";
 import { lawKeyFromActRef, lawUrlFromKey } from "../lib/urls";
 import { actNames } from "../views/changes";
 import { pageNumber } from "../lib/act";
 import { HITS_LIMIT, MAX_QUERY, renderSearch } from "../views/search";
 
-function isSelected(manifest: Manifest, citation: Citation): boolean {
+function isSelected(index: ActIndexEntry[], citation: Citation): boolean {
   const { alias, kind, number, year } = citation.act;
-  if (alias !== undefined) return manifest.acts.some((act) => act.alias === alias);
-  return manifest.acts.some((act) => act.path === `${kind}/${year}/${number}`);
+  if (alias !== undefined) return index.some((act) => act.alias === alias);
+  return index.some((act) => act.path === `${kind}/${year}/${number}`);
 }
 
 async function amendingActUrl(store: Store, citation: Citation): Promise<string | null> {
@@ -29,14 +29,14 @@ searchRoutes.get("/cauta", async (c) => {
   const query = (c.req.query("q") ?? "").slice(0, MAX_QUERY).trim();
   const inForce = c.req.query("in_force") === "1";
   const store = c.get("store");
-  const manifest = await store.manifest();
-  const names = actNames(manifest);
+  const index = await store.actIndex();
+  const names = actNames(index);
 
   if (query === "") return c.html(renderSearch({ query, inForce, hits: null, total: 0, over: false, live: false, page: 1, pages: 1, names }));
 
   const citation = parseCitation(query);
   const target = citation === null ? null : citationUrl(citation);
-  if (citation !== null && target !== null && isSelected(manifest, citation)) {
+  if (citation !== null && target !== null && isSelected(index, citation)) {
     return c.redirect(target, 302);
   }
   const law = citation === null ? null : await amendingActUrl(store, citation);

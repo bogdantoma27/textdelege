@@ -18,7 +18,7 @@ export type Route =
   | { kind: "pointInTime"; date: string }
   | { kind: "help"; page: "despre" | "legenda" };
 
-const NUMBERED_KINDS = new Set(["lege", "oug", "og", "hg", "decret", "decret-lege"]);
+const NUMBERED_KINDS = new Set(["lege", "oug", "og", "hg", "decret", "decret-lege", "hotarare-parlament"]);
 const PANELS = new Set(["ril", "hp", "hp-penal", "su", "scaf", "alte"]);
 const TABS = new Set(["istoric", "jurisprudenta", "statistici", "date"]);
 const HELP = new Set(["despre", "legenda"]);
@@ -26,6 +26,7 @@ const RESERVED = new Set([
   "modificari",
   "jurisprudenta",
   "legislatie",
+  "acte",
   "la-data",
   "despre",
   "legenda",

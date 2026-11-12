@@ -1,0 +1,27 @@
+{
+  "schema": "textdelege/act-index/1",
+  "acts": [
+    {
+      "path": "lege/2009/287",
+      "alias": "codul-civil",
+      "title": "Legea nr. 287/2009",
+      "short": "Codul civil",
+      "kind": "lege",
+      "status": "in force",
+      "from": "2011-10-01",
+      "latest": "2023-07-09",
+      "articles": 2
+    },
+    {
+      "path": "lege/2010/134",
+      "alias": "codul-procedura",
+      "title": "Legea nr. 134/2010",
+      "short": "Codul de procedura",
+      "kind": "lege",
+      "status": "in force",
+      "from": "2011-10-01",
+      "latest": "2023-07-09",
+      "articles": 1
+    }
+  ]
+}

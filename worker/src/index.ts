@@ -12,6 +12,7 @@ import { lawRoutes } from "./routes/law";
 import { pointInTimeRoutes } from "./routes/pointInTime";
 import { rulingRoutes } from "./routes/ruling";
 import { searchRoutes } from "./routes/search";
+import { actsRoutes } from "./routes/acts";
 import { errorHandler, notFoundHandler, siteRoutes } from "./routes/site";
 import { ORIGIN } from "./views/layout";
 
@@ -65,6 +66,7 @@ app.use("*", async (c, next) => {
 app.route("/", siteRoutes);
 app.route("/", homeRoutes);
 app.route("/", searchRoutes);
+app.route("/", actsRoutes);
 app.route("/", changesRoutes);
 app.route("/", articleRoutes);
 app.route("/", compareRoutes);

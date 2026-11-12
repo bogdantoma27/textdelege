@@ -231,6 +231,23 @@ export interface ManifestAct {
   freshness_status: FreshnessStatus | null;
 }
 
+export interface ActIndexEntry {
+  path: string;
+  alias: string | null;
+  title: string;
+  short: string | null;
+  kind: string;
+  status: string;
+  from: string | null;
+  latest: string;
+  articles: number;
+}
+
+export interface ActIndex {
+  schema: string;
+  acts: ActIndexEntry[];
+}
+
 export interface OfficialSource {
   name: string;
   state: "available" | "unavailable";

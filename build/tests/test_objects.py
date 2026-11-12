@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 import unittest
 from datetime import date
 from pathlib import Path
@@ -14,6 +15,7 @@ from build.textdelege.objects import (
     changes_object,
     law_object,
     lead,
+    act_index_object,
     manifest_object,
     object_key,
     articles_by_ruling,
@@ -79,6 +81,7 @@ NULLABLE = {
     "law": {"enacted", "published", "source", "mo"},
     "ruling": {"subtitle", "binding_from", "text"},
     "changes": {"items[].title", "items[].law", "upcoming[].title", "upcoming[].law"},
+    "act-index": {"acts[].alias", "acts[].short"},
     "manifest": {
         "acts[].alias", "acts[].short", "acts[].freshness_status", "freshness.as_of",
         "freshness.checked_against_official_source",
@@ -252,6 +255,7 @@ def build_all() -> dict[str, dict]:
         "changes": changes_object(
             PATH, changes_feed(articles, 20, TODAY), upcoming(articles, TODAY)
         ),
+        "act-index": act_index_object([ACT], {PATH: {"articles": 1, "versions": 2}}),
         "manifest": manifest_object(
             "20261108T060000Z",
             "5" * 40,
@@ -274,6 +278,7 @@ class KeyTest(unittest.TestCase):
         )
         self.assertEqual(object_key("law", L200), f"laws/{L200}.json")
         self.assertEqual(object_key("ruling", "ccr-1-2020"), "rulings/ccr-1-2020.json")
+        self.assertEqual(object_key("act-index"), "acts/index.json")
         self.assertEqual(object_key("changes-site"), "changes/site.json")
         self.assertEqual(object_key("changes-act", PATH), f"changes/acts/{PATH}.json")
 
@@ -434,6 +439,26 @@ class ChangesAndManifestTest(unittest.TestCase):
         missing = manifest_object("b", "h", "g", {}, [ACT], {}, {}, {}, {})
         self.assertIsNone(missing["acts"][0]["freshness_status"])
         self.assertEqual((missing["acts"][0]["articles"], missing["acts"][0]["versions"]), (0, 0))
+
+    def test_manifest_keeps_only_featured_acts(self):
+        plain = replace(ACT, path="lege/1990/31", code=None, alias=None, short=None)
+        constitution = replace(ACT, path="constitutie/1991", kind="constitutie", code=None)
+        obj = manifest_object("b", "h", "g", {}, [constitution, plain, ACT], {}, {}, {}, {})
+        self.assertEqual([a["path"] for a in obj["acts"]], ["constitutie/1991", PATH])
+        self.assertEqual(obj["schema"], "textdelege/manifest/1")
+
+    def test_act_index_lists_every_act(self):
+        plain = replace(ACT, path="lege/1990/31", code=None, alias=None, short=None, kind="lege")
+        obj = act_index_object([ACT, plain], {PATH: {"articles": 5, "versions": 9}})
+        self.assertEqual(obj["schema"], "textdelege/act-index/1")
+        self.assertEqual([a["path"] for a in obj["acts"]], [PATH, "lege/1990/31"])
+        self.assertEqual(
+            obj["acts"][0],
+            {"path": PATH, "alias": "codul-civil", "title": ACT.title, "short": "Codul civil",
+             "kind": "law", "status": ACT.status, "from": "2011-10-01",
+             "latest": "2023-07-09", "articles": 5},
+        )
+        self.assertEqual((obj["acts"][1]["alias"], obj["acts"][1]["articles"]), (None, 0))
 
 
 class DocumentationTest(unittest.TestCase):

@@ -1,4 +1,4 @@
--- schema_version: 2
+-- schema_version: 3
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 
 CREATE TABLE IF NOT EXISTS acts (
@@ -9,8 +9,15 @@ CREATE TABLE IF NOT EXISTS acts (
   title TEXT,
   short TEXT,
   status TEXT,
-  freshness_status TEXT
+  freshness_status TEXT,
+  year INTEGER,
+  number TEXT,
+  from_date TEXT,
+  latest TEXT,
+  articles INTEGER
 );
+CREATE INDEX IF NOT EXISTS acts_by_kind_year ON acts (kind, year);
+CREATE INDEX IF NOT EXISTS acts_by_year ON acts (year, number);
 
 CREATE TABLE IF NOT EXISTS articles (
   act_path TEXT NOT NULL,

@@ -12,7 +12,7 @@ import {
 } from "../lib/act";
 import { dayBefore, formatRo } from "../lib/dates";
 import { linkCrossReferences } from "../lib/text";
-import type { ActArticleEntry, ActObject, ArticleObject, ArticleRuling, TimelineEntry } from "../lib/types";
+import type { ActArticleEntry, ActObject, ArticleObject, ArticleRuling, LawObject, TimelineEntry } from "../lib/types";
 import { actUrl, articleSlug, articleUrl, changesUrl, compareUrl, lawUrlFromKey, subscribeUrl } from "../lib/urls";
 import { resolveView } from "../lib/versions";
 import { Paragraph } from "./article";
@@ -21,6 +21,8 @@ import { Breadcrumbs, DataTable, ErrorSummary, FieldError, Pagination, Panel, Su
 import { Indexed } from "./indexed";
 import { Layout, ORIGIN } from "./layout";
 import { LawLink, STATE_BADGE_ID, STATE_LABEL, StatusBadge, lawLabelText, outcomeText, type BadgeId } from "./shared";
+import type { ActNames } from "./changes";
+import { ChangesMade } from "./law";
 
 export type ActTab = "text" | "istoric" | "jurisprudenta" | "statistici" | "date";
 
@@ -58,6 +60,7 @@ const KINDS: Record<string, Key> = {
   constitutie: "kindConstitutie",
   constitution: "kindConstitutie",
   cod: "kindCod",
+  "hotarare-parlament": "kindHotarareParlament",
   code: "kindCod",
 };
 
@@ -547,6 +550,7 @@ export function renderAct(
   tab: ActTab,
   text?: ActText,
   rulings: ArticleRuling[] = [],
+  made?: { law: LawObject; names: ActNames },
 ) {
   const actRef = act.alias ?? act.path;
   const current = TABS.find((item) => item.tab === tab)!;
@@ -589,6 +593,9 @@ export function renderAct(
         <Header ctx={ctx} act={act} actRef={actRef} tab={tab} />
         <div class="tabs-panel">
           {tab === "text" && text !== undefined && <FullText {...props} ctx={ctx} path={path} text={text} />}
+          {tab === "text" && made !== undefined && (
+            <ChangesMade law={made.law} names={made.names} requested={1} pageHref={null} />
+          )}
           {history !== null && <History {...props} ctx={ctx} paged={history} />}
           {tab === "jurisprudenta" && <Rulings {...props} byArticle={rulings} />}
           {tab === "statistici" && <Statistics {...props} />}

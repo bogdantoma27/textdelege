@@ -4,7 +4,8 @@ import { CHUNK, inChunks } from "../lib/compare";
 import { parseDate, today } from "../lib/dates";
 import { resolveAct } from "../lib/resolve";
 import type { AppEnv } from "../lib/store";
-import { actUrl, parsePath } from "../lib/urls";
+import { actUrl, lawKeyFromActRef, parsePath } from "../lib/urls";
+import { actNames } from "../views/changes";
 import { type ActTab, renderAct } from "../views/act";
 import { Contents } from "../views/article-rails";
 
@@ -91,6 +92,9 @@ actRoutes.get("*", async (c, next) => {
     const articles = await inChunks(paged.items, CHUNK, (entry) => store.article(act.path, entry.file));
     text = { paged, articles };
   }
+  const key = tab === "text" && (ctx.page ?? 1) === 1 ? lawKeyFromActRef(act.path) : null;
+  const law = key === null ? null : await store.law(key);
+  const made = law === null ? undefined : { law, names: actNames(await store.actIndex()) };
   const rulings = tab === "jurisprudenta" ? await store.actRulings(act.path) : undefined;
-  return c.html(renderAct(ctx, act, tab, text, rulings), invalid === undefined ? 200 : 400);
+  return c.html(renderAct(ctx, act, tab, text, rulings, made), invalid === undefined ? 200 : 400);
 });

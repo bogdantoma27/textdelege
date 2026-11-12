@@ -6,12 +6,14 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
 from build.tests.sourcerepo import ARTICLE_1, CIVIL, OTHER, PROCEDURE, RULING_KEY, SourceRepo
 from build.textdelege import cli
+from build.textdelege.acts import ActMeta
 from build.textdelege.d1 import SCHEMA_VERSION, D1Error, D1QuotaExceeded
 from build.textdelege.extract import Article, Line, Version
 from build.textdelege.gitrepo import GitError
@@ -119,6 +121,26 @@ class MismatchOutputTest(unittest.TestCase):
         self.assertIn("  +x", lines)
 
 
+class ActRowTest(unittest.TestCase):
+    def meta(self, **changes):
+        base = ActMeta(
+            "lege/1990/31", "lege-31", "lege", 1990, "31", "Legea 31", None, None, None,
+            "in force", "https://x", 3, date(1990, 1, 2), date(2020, 3, 4),
+        )
+        return replace(base, **changes)
+
+    def test_numbered_act_row_has_listing_columns(self):
+        row = cli.act_row(self.meta(), "fresh", 7)
+        self.assertEqual(
+            {k: row[k] for k in ("year", "number", "from_date", "latest", "articles")},
+            {"year": 1990, "number": "31", "from_date": "1990-01-02", "latest": "2020-03-04", "articles": 7},
+        )
+
+    def test_act_without_number_gets_null_number(self):
+        row = cli.act_row(self.meta(path="constitutie/1991", kind="constitutie", year=1991, number=""), None, 0)
+        self.assertEqual((row["year"], row["number"], row["articles"]), (1991, None, 0))
+
+
 class SearchRowsTest(unittest.TestCase):
     def test_snippet_markers_are_stripped_from_search_rows(self):
         line = Line(text="Text \ue000forged\ue001 end", id="alin-1", since=TODAY, law_key="")
@@ -170,6 +192,7 @@ class CliTest(unittest.TestCase):
         out = self.cache / "out"
         for key in (
             "manifest.json",
+            "acts/index.json",
             f"acts/{CIVIL}/act.json",
             f"acts/{CIVIL}/art/{ARTICLE_1}.json",
             f"acts/{CIVIL}/art/art-0002.json",
@@ -193,6 +216,13 @@ class CliTest(unittest.TestCase):
             {"acts": 2, "articles": 3, "versions": 4, "laws": 2, "rulings": 1},
         )
         self.assertEqual(manifest["status"]["schema"], "romania-law-status/1")
+        index = self.out("acts/index.json")
+        self.assertEqual(index["schema"], "textdelege/act-index/1")
+        self.assertEqual([a["path"] for a in index["acts"]], [CIVIL, PROCEDURE])
+        self.assertEqual(index["acts"][0]["articles"], 2)
+        self.assertEqual(
+            sorted(index["acts"][0]), ["alias", "articles", "from", "kind", "latest", "path", "short", "status", "title"],
+        )
         sql = (out / "index.sql").read_bytes().decode("utf-8")
         self.assertIn("INSERT OR REPLACE INTO articles_fts (rowid, act_path", sql)
         self.assertNotIn("\r", sql)

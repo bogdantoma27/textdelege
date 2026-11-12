@@ -14,6 +14,7 @@ from build.textdelege.d1 import SCHEMA_PATH, SCHEMA_VERSION, D1Client, D1Error, 
 SCHEMA_HASHES = {
     1: "86c5b1fb6cc35829e8922d0b4b73751248aa016ac63ec3c3c92e2851603c2bc2",
     2: "596056aee3c6c20c9967066a62b16baede6b22625ed8e1b4b53f5fd26aded83f",
+    3: "b81fc31511853f7a51830b865276491714382fcdb8ce988008e58fcb3f25ac53",
 }
 
 

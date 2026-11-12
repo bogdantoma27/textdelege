@@ -17,6 +17,6 @@ lawRoutes.get("*", async (c, next) => {
   const law = await store.law(key);
   if (law === null) return c.notFound();
 
-  const manifest = await store.manifest();
-  return c.html(renderLaw(law, actNames(manifest), pageNumber(c.req.query("pagina") ?? null)));
+  const index = await store.actIndex();
+  return c.html(renderLaw(law, actNames(index), pageNumber(c.req.query("pagina") ?? null)));
 });

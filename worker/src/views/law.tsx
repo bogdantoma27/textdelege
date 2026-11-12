@@ -114,17 +114,80 @@ function Row(ref: string, change: LawChange): Child[] {
   ];
 }
 
-export function renderLaw(law: LawObject, names: ActNames, requested: number) {
-  const paged = paginate(law.changes, requested, LAW_PAGE);
+export function ChangesMade(props: {
+  law: LawObject;
+  names: ActNames;
+  requested: number;
+  pageHref: ((page: number) => string) | null;
+}) {
+  const { law, names } = props;
+  const paged = paginate(law.changes, props.requested, LAW_PAGE);
   const groups = groupChanges(paged.items, names);
   const summary = summarize(law.changes);
   const verbs = (Object.keys(VERBS) as EventVerb[]).filter((verb) =>
     [...summary.acts.values()].some((act) => act.byVerb.has(verb)),
   );
+  const nameOf = (actPath: string) => names.get(actPath)?.name ?? actPath;
+  const head = [t("changesColArticle"), t("changesColChange"), t("changesColDate"), t("lawColText")];
+  return (
+    <section aria-labelledby="modificari-aduse">
+      <h2 id="modificari-aduse">{t("lawChangesHeading")}</h2>
+      {groups.length === 0 && <p>{t("lawChangesNone")}</p>}
+      {groups.length > 0 && (
+        <>
+          <p>
+            {t("lawSummary", {
+              articles: articlesText(summary.articles),
+              acts: tPlural(summary.acts.size, ACTS, { n: grouped(summary.acts.size) }),
+            })}
+          </p>
+          <DataTable
+            head={[t("changesColAct"), ...verbs.map((verb) => t(VERBS[verb])), t("lawColTotal")]}
+            rows={[...summary.acts].map(([actPath, act]) => [
+              nameOf(actPath),
+              ...verbs.map((verb) => String(act.byVerb.get(verb)?.size ?? 0)),
+              String(act.articles.size),
+            ])}
+          />
+          {paged.pages > 1 && (
+            <p class="results-bar">
+              <span class="count">
+                {t("lawRange", {
+                  first: grouped((paged.page - 1) * LAW_PAGE + 1),
+                  last: grouped((paged.page - 1) * LAW_PAGE + paged.items.length),
+                  total: grouped(paged.total),
+                })}
+              </span>
+            </p>
+          )}
+        </>
+      )}
+      {groups.map((group) => (
+        <>
+          <h3>
+            <a href={actUrl(group.ref)}>{group.name}</a>{" "}
+            <span class="group-count">
+              ({articlesText(summary.acts.get(group.changes[0]!.act_path)?.articles.size ?? 0)})
+            </span>
+          </h3>
+          <DataTable head={head} rows={group.changes.map((change) => Row(group.ref, change))} />
+        </>
+      ))}
+      {props.pageHref !== null && <PageNumbers current={paged.page} pages={paged.pages} href={props.pageHref} />}
+      {props.pageHref === null && paged.pages > 1 && (
+        <p>
+          <a href={lawUrlFromKey(law.key) ?? "/"}>{t("lawChangesAll")}</a>
+        </p>
+      )}
+    </section>
+  );
+}
+
+export function renderLaw(law: LawObject, names: ActNames, requested: number) {
+  const paged = paginate(law.changes, requested, LAW_PAGE);
   const path = lawUrlFromKey(law.key) ?? "/";
   const pageHref = (n: number) => `${path}${n > 1 ? `?pagina=${n}` : ""}`;
   const permanent = `${ORIGIN}${path}`;
-  const nameOf = (actPath: string) => names.get(actPath)?.name ?? actPath;
   const official = law.source ?? PORTAL;
   const rows: { label: string; value: Child }[] = [];
   if (law.published !== null) rows.push({ label: t("lawPublished"), value: formatRo(law.published) });
@@ -133,13 +196,6 @@ export function renderLaw(law: LawObject, names: ActNames, requested: number) {
     rows.push({ label: t("lawInForce"), value: <InForce days={law.in_force} /> });
   }
   if (law.mo !== null) rows.push({ label: t("metaMo"), value: <span lang="ro">{law.mo}</span> });
-
-  const head = [
-    t("changesColArticle"),
-    t("changesColChange"),
-    t("changesColDate"),
-    t("lawColText"),
-  ];
 
   return (
     <Layout
@@ -175,51 +231,7 @@ export function renderLaw(law: LawObject, names: ActNames, requested: number) {
         {rows.length > 0 && (
           <SummaryList rows={rows} />
         )}
-        <section aria-labelledby="modificari-aduse">
-          <h2 id="modificari-aduse">{t("lawChangesHeading")}</h2>
-          {groups.length === 0 && <p>{t("lawChangesNone")}</p>}
-          {groups.length > 0 && (
-            <>
-              <p>
-                {t("lawSummary", {
-                  articles: articlesText(summary.articles),
-                  acts: tPlural(summary.acts.size, ACTS, { n: grouped(summary.acts.size) }),
-                })}
-              </p>
-              <DataTable
-                head={[t("changesColAct"), ...verbs.map((verb) => t(VERBS[verb])), t("lawColTotal")]}
-                rows={[...summary.acts].map(([actPath, act]) => [
-                  nameOf(actPath),
-                  ...verbs.map((verb) => String(act.byVerb.get(verb)?.size ?? 0)),
-                  String(act.articles.size),
-                ])}
-              />
-              {paged.pages > 1 && (
-                <p class="results-bar">
-                  <span class="count">
-                    {t("lawRange", {
-                      first: grouped((paged.page - 1) * LAW_PAGE + 1),
-                      last: grouped((paged.page - 1) * LAW_PAGE + paged.items.length),
-                      total: grouped(paged.total),
-                    })}
-                  </span>
-                </p>
-              )}
-            </>
-          )}
-          {groups.map((group) => (
-            <>
-              <h3>
-                <a href={actUrl(group.ref)}>{group.name}</a>{" "}
-                <span class="group-count">
-                  ({articlesText(summary.acts.get(group.changes[0]!.act_path)?.articles.size ?? 0)})
-                </span>
-              </h3>
-              <DataTable head={head} rows={group.changes.map((change) => Row(group.ref, change))} />
-            </>
-          ))}
-          <PageNumbers current={paged.page} pages={paged.pages} href={pageHref} />
-        </section>
+        <ChangesMade law={law} names={names} requested={requested} pageHref={pageHref} />
       </section>
     </Layout>
   );

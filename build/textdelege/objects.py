@@ -1,7 +1,7 @@
 from datetime import date
 from pathlib import Path
 
-from .acts import ActMeta
+from .acts import ActMeta, _is_code
 from .events import Event, events_for
 from .extract import ALIN, PCT, Article, Version
 from .laws import Law
@@ -21,6 +21,8 @@ def object_key(kind: str, *parts: str) -> str:
             return f"laws/{key}.json"
         case "ruling", (key,):
             return f"rulings/{key}.json"
+        case "act-index", ():
+            return "acts/index.json"
         case "changes-site", ():
             return "changes/site.json"
         case "changes-act", (path,):
@@ -304,6 +306,26 @@ def changes_object(scope: str, items: list[dict], upcoming: list[dict]) -> dict:
     }
 
 
+def act_index_object(acts: list[ActMeta], stats: dict[str, dict[str, int]]) -> dict:
+    return {
+        "schema": "textdelege/act-index/1",
+        "acts": [
+            {
+                "path": act.path,
+                "alias": act.alias,
+                "title": act.title,
+                "short": act.short,
+                "kind": act.kind,
+                "status": act.status,
+                "from": _iso(act.from_),
+                "latest": _iso(act.latest),
+                "articles": (stats.get(act.path) or {}).get("articles", 0),
+            }
+            for act in acts
+        ],
+    }
+
+
 def manifest_object(
     build_id: str,
     source_head: str,
@@ -335,6 +357,7 @@ def manifest_object(
                 "freshness_status": (freshness.get(act.path) or {}).get("status"),
             }
             for act in acts
+            if _is_code(act)
         ],
         "freshness": {
             "as_of": freshness_summary.get("as_of"),

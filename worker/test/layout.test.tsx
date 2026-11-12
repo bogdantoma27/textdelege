@@ -232,6 +232,7 @@ describe("Layout", () => {
     const links = [...footer.matchAll(/<li><a href="([^"]+)">/g)].map((m) => m[1]);
     expect(links).toEqual([
       "/#coduri",
+      "/acte",
       "/modificari",
       "/legislatie",
       "/cauta",

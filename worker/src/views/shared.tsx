@@ -80,3 +80,32 @@ export function LawLink({ lawKey, label }: { lawKey: string; label: string }) {
   const href = lawUrlFromKey(lawKey);
   return href === null ? <a href={UNNAMED_HREF}>{t("lawUnnamed")}</a> : <a href={href}>{label}</a>;
 }
+
+export const KINDS = [
+  "constitutie",
+  "cod",
+  "lege",
+  "oug",
+  "og",
+  "hg",
+  "decret-lege",
+  "decret",
+  "hotarare-parlament",
+] as const;
+
+const KIND_PLURALS: Record<string, Key> = {
+  constitutie: "kindsConstitutie",
+  cod: "kindsCod",
+  lege: "kindsLege",
+  oug: "kindsOug",
+  og: "kindsOg",
+  hg: "kindsHg",
+  decret: "kindsDecret",
+  "decret-lege": "kindsDecretLege",
+  "hotarare-parlament": "kindsHotarareParlament",
+};
+
+export function kindPlural(kind: string): string {
+  const key = KIND_PLURALS[kind];
+  return key === undefined ? t("pitKindOther") : t(key);
+}

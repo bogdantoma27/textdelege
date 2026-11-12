@@ -30,7 +30,7 @@ export function errorHandler(error: Error, c: Context<AppEnv>) {
 
 export const SITEMAP_SIZE = 50000;
 
-const FIXED_PAGES = ["/", "/modificari", "/despre", "/legenda", "/legislatie"];
+const FIXED_PAGES = ["/", "/modificari", "/acte", "/despre", "/legenda", "/legislatie"];
 
 const ROBOTS = `User-agent: *
 Allow: /

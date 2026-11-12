@@ -136,6 +136,12 @@ describe("citationUrl", () => {
     ["O.U.G. nr. 57/2019 art. 10 alin. 2", "/oug/2019/57/art-10#alin-2"],
     ["OG 2/2001", "/og/2001/2"],
     ["HG 10/2016", "/hg/2016/10"],
+    ["Decretul-lege nr. 115/1938", "/decret-lege/1938/115"],
+    ["D.-L. 115/1938", "/decret-lege/1938/115"],
+    ["Decretul nr. 1/1990", "/decret/1990/1"],
+    ["Hotărârea Parlamentului nr. 1/2000", "/hotarare-parlament/2000/1"],
+    ["HP 1/2000", "/hotarare-parlament/2000/1"],
+    ["Hotărârea Guvernului nr. 1/2000 art. 3", "/hg/2000/1/art-3"],
     ["impozit pe venit", null],
   ];
 

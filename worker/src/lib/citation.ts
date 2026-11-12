@@ -49,10 +49,13 @@ const CODE_REGEXES = CODE_PATTERNS.map(
 );
 
 const NUMBERED_PATTERNS: [string, string][] = [
+  ["decret-lege", "decretul[- ]lege|decretului[- ]lege|decret[- ]lege|d\\.? ?-? ?l\\.?"],
+  ["hotarare-parlament", "hotararea parlamentului|hotararii parlamentului|h\\.? ?p\\.?"],
   ["lege", "legea|legii|lege"],
   ["oug", "o\\.? ?u\\.? ?g\\.?|ordonanta de urgenta(?: a guvernului)?"],
   ["og", "o\\.? ?g\\.?|ordonanta(?: guvernului)?"],
   ["hg", "h\\.? ?g\\.?|hotararea(?: guvernului)?"],
+  ["decret", "decretul|decretului|decret"],
 ];
 
 const NUMBERED_REGEXES = NUMBERED_PATTERNS.map(

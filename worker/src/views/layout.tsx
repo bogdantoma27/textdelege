@@ -68,18 +68,22 @@ export function SearchForm(props: { query?: string; id: string; class: string })
 
 type Mark = "page" | "true" | undefined;
 
-function sectionMarks(path: string, inCodes: boolean): { codes: Mark; changes: Mark } {
+function sectionMarks(path: string, inCodes: boolean): { codes: Mark; acts: Mark; changes: Mark } {
   return {
     codes: path === "/" ? "page" : inCodes ? "true" : undefined,
+    acts: path === "/acte" ? "page" : undefined,
     changes: path === "/modificari" ? "page" : path.startsWith("/modificari/") ? "true" : undefined,
   };
 }
 
-function NavLinks({ marks }: { marks: { codes: Mark; changes: Mark } }) {
+function NavLinks({ marks }: { marks: { codes: Mark; acts: Mark; changes: Mark } }) {
   return (
     <>
       <a href="/#coduri" aria-current={marks.codes} data-text={t("navCodes")}>
         {t("navCodes")}
+      </a>
+      <a href="/acte" aria-current={marks.acts} data-text={t("navActs")}>
+        {t("navActs")}
       </a>
       <a href="/modificari" aria-current={marks.changes} data-text={t("navChanges")}>
         {t("navChanges")}
@@ -215,6 +219,7 @@ function Footer({ compact }: { compact?: boolean }) {
             heading={t("footerExplore")}
             links={[
               { label: t("navCodes"), href: "/#coduri" },
+              { label: t("navActs"), href: "/acte" },
               { label: t("navChanges"), href: "/modificari" },
               { label: t("footerPointInTime"), href: "/legislatie" },
               { label: t("footerSearch"), href: "/cauta" },

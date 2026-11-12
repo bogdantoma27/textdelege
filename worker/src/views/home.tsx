@@ -4,7 +4,7 @@ import { actName, isCurrent, ordered } from "../lib/act-order";
 import { parseActStatus } from "../lib/status";
 import type { ChangeItem, ChangesObject, Manifest, ManifestAct } from "../lib/types";
 import { SOURCE_REPOSITORY, actUrl } from "../lib/urls";
-import { type ActNames, actNames, actOf, changeAction, changeArticle, changeCells, changesHead } from "./changes";
+import { type ActNames, actOf, changeAction, changeArticle, changeCells, changesHead } from "./changes";
 import { DataTable, DateField, DateHint, Tabs } from "./components";
 import { Layout, ORIGIN } from "./layout";
 import { StatusBadge, grouped } from "./shared";
@@ -209,13 +209,17 @@ function Upcoming({ items, names }: { items: ChangeItem[]; names: ActNames }) {
   );
 }
 
-export function renderHome(ctx: { now: string; historical: boolean }, manifest: Manifest, changes: ChangesObject | null) {
+export function renderHome(
+  ctx: { now: string; historical: boolean },
+  manifest: Manifest,
+  changes: ChangesObject | null,
+  names: ActNames,
+) {
   const acts = ordered(manifest.acts);
   const current = acts.filter(isCurrent);
   const historical = acts.filter((act) => !isCurrent(act));
   const tabbed = historical.length > 0;
   const showHistorical = ctx.historical && tabbed;
-  const names = actNames(manifest);
   const recent = (changes?.items ?? []).slice(0, RECENT);
   const upcoming = (changes?.upcoming ?? []).slice(0, UPCOMING);
   const head = changesHead();
@@ -254,6 +258,9 @@ export function renderHome(ctx: { now: string; historical: boolean }, manifest: 
           {tabbed && (
             <CodeList acts={historical} now={ctx.now} id="coduri-istorice" tabbed hidden={!showHistorical} />
           )}
+          <p>
+            <a href="/acte">{t("homeAllActs")}</a>
+          </p>
         </section>
         <DateRow now={ctx.now} />
         <div class={upcoming.length > 0 ? "home-changes split" : "home-changes"}>

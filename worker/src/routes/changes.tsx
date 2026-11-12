@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { genitive, t } from "../text";
-import { FEED_LIMIT, applyFilters, filterQuery, parseFilters } from "../lib/change-filter";
+import { FEED_LIMIT, MAX_QUERY, applyFilters, filterQuery, parseFilters } from "../lib/change-filter";
 import { formatRo, parseDate, today } from "../lib/dates";
 import { type FeedEntry, atom, tagId } from "../lib/feed";
-import { resolveAct } from "../lib/resolve";
+import { findCitedAct, resolveAct } from "../lib/resolve";
 import type { AppEnv, Store } from "../lib/store";
 import { unitText } from "../lib/text";
-import type { ChangeItem, ChangesObject, Manifest } from "../lib/types";
+import type { ActIndexEntry, ChangeItem, ChangesObject } from "../lib/types";
 import { articleUrl, changesUrl, parsePath } from "../lib/urls";
 import { type ActNames, type ChangesPage, actChoices, actNames, renderChanges } from "../views/changes";
 import { ORIGIN } from "../views/layout";
@@ -61,10 +61,10 @@ function splitOn(now: string, changes: ChangesObject | null) {
 
 async function scopeOf(
   store: Store,
-  manifest: Manifest,
+  index: ActIndexEntry[],
   route: { actRef: string | null; number: string | null },
 ): Promise<Scope | null> {
-  const names = actNames(manifest);
+  const names = actNames(index);
   const now = today();
   if (route.actRef === null) {
     const site = await store.changes("site");
@@ -128,24 +128,28 @@ changesRoutes.get("*", async (c, next) => {
   if (route?.kind !== "changes") return next();
 
   const store = c.get("store");
-  const manifest = await store.manifest();
-  const scope = await scopeOf(store, manifest, route);
+  const [manifest, index] = await Promise.all([store.manifest(), store.actIndex()]);
+  const scope = await scopeOf(store, index, route);
   if (scope === null) return c.notFound();
 
   const refs = route.actRef === null ? new Set([...scope.names.values()].map((act) => act.ref)) : null;
-  const filters = parseFilters(new URL(c.req.url).searchParams, refs);
+  const params = new URL(c.req.url).searchParams;
+  const filters = parseFilters(params, refs);
+  const alt = route.actRef === null ? (params.get("alt") ?? "").trim().slice(0, MAX_QUERY).trim() : "";
+  const cited = alt === "" ? null : findCitedAct(index, alt);
+  if (cited !== null) filters.act = cited.alias ?? cited.path;
+  const altInvalid = alt !== "" && cited === null;
   const actPath =
     filters.act === null
       ? null
       : ([...scope.names].find(([, act]) => act.ref === filters.act)?.[0] ?? null);
-  const typed = new URL(c.req.url).searchParams;
   const invalid: Record<string, string> = {};
   for (const name of ["de", "pana"]) {
-    const value = (typed.get(name) ?? "").trim();
+    const value = (params.get(name) ?? "").trim();
     if (value !== "" && parseDate(value) === null) invalid[name] = value;
   }
   const nameOf = (path: string) => scope.names.get(path)?.name ?? path;
-  if (route.format === "html" && route.actRef === null && filters.act !== null) {
+  if (route.format === "html" && route.actRef === null && filters.act !== null && !altInvalid) {
     return c.redirect(`${changesUrl(filters.act)}${filterQuery({ ...filters, act: null })}`, 302);
   }
   if (route.format === "subscribe") {
@@ -171,11 +175,13 @@ changesRoutes.get("*", async (c, next) => {
       upcoming: [...upcoming].sort(newestFirst).reverse(),
       names: scope.names,
       filters,
-      choices: route.actRef === null ? actChoices(manifest) : null,
+      choices: route.actRef === null ? actChoices(manifest.acts) : null,
       window: route.actRef === null ? "site" : route.number === null ? "act" : null,
       invalid,
+      alt,
+      altInvalid,
     };
-    return c.html(renderChanges(page), Object.keys(invalid).length === 0 ? 200 : 400);
+    return c.html(renderChanges(page), Object.keys(invalid).length === 0 && !altInvalid ? 200 : 400);
   }
 
   const entries = [...items, ...upcoming]

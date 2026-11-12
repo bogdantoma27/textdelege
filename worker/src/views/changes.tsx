@@ -1,10 +1,10 @@
 import type { Child } from "hono/jsx";
 import { t, tPlural } from "../text";
-import { actName, isCurrent, ordered } from "../lib/act-order";
+import { type OrderedAct, actName, isCurrent, ordered } from "../lib/act-order";
 import { type ChangeFilters, FEED_LIMIT, FILTER_VERBS, MAX_QUERY, filterQuery } from "../lib/change-filter";
 import { formatRo } from "../lib/dates";
 import { unitText } from "../lib/text";
-import type { ChangeItem, Manifest, ManifestAct } from "../lib/types";
+import type { ChangeItem } from "../lib/types";
 import { actUrl, articleUrl } from "../lib/urls";
 import { Breadcrumbs, DataTable, DateField, DateHint, ErrorSummary, FieldError } from "./components";
 import { Indexed } from "./indexed";
@@ -13,9 +13,9 @@ import { LawLink, StatusBadge, VERBS } from "./shared";
 
 export type ActNames = Map<string, { ref: string; name: string }>;
 
-export function actNames(manifest: Manifest): ActNames {
+export function actNames(acts: (OrderedAct & { path: string })[]): ActNames {
   return new Map(
-    manifest.acts.map((act) => [act.path, { ref: act.alias ?? act.path, name: act.short ?? act.title }]),
+    acts.map((act) => [act.path, { ref: act.alias ?? act.path, name: act.short ?? act.title }]),
   );
 }
 
@@ -90,9 +90,9 @@ export interface ActChoices {
   historical: ActChoice[];
 }
 
-export function actChoices(manifest: Manifest): ActChoices {
-  const choice = (act: ManifestAct): ActChoice => ({ ref: act.alias ?? act.path, name: actName(act) });
-  const acts = ordered(manifest.acts);
+export function actChoices(featured: (OrderedAct & { path: string })[]): ActChoices {
+  const choice = (act: OrderedAct & { path: string }): ActChoice => ({ ref: act.alias ?? act.path, name: actName(act) });
+  const acts = ordered(featured);
   return {
     current: acts.filter(isCurrent).map(choice),
     historical: acts.filter((act) => !isCurrent(act)).map(choice),
@@ -109,6 +109,8 @@ export interface ChangesPage {
   choices: ActChoices | null;
   window: "site" | "act" | null;
   invalid: Record<string, string>;
+  alt: string;
+  altInvalid: boolean;
 }
 
 function FilterForm({ page }: { page: ChangesPage }) {
@@ -152,6 +154,27 @@ function FilterForm({ page }: { page: ChangesPage }) {
                 ),
             )}
           </select>
+        </div>
+      )}
+      {page.choices !== null && (
+        <div class={page.altInvalid ? "form-group error" : "form-group"}>
+          <label class="label" for="filter-alt">
+            {t("changesFilterAlt")}
+          </label>
+          <p class="hint" id="filter-alt-hint">
+            {t("changesFilterAltHint")}
+          </p>
+          {page.altInvalid && <FieldError id="filter-alt">{t("changesFilterAltInvalid", { act: page.alt })}</FieldError>}
+          <input
+            class="field"
+            id="filter-alt"
+            type="text"
+            name="alt"
+            value={page.alt === "" ? undefined : page.alt}
+            maxlength={MAX_QUERY}
+            autocomplete="off"
+            aria-describedby={page.altInvalid ? "filter-alt-hint filter-alt-error" : "filter-alt-hint"}
+          />
         </div>
       )}
       <div class="form-group">
@@ -221,6 +244,7 @@ export function renderChanges(page: ChangesPage) {
   const problems = [
     page.invalid.de !== undefined && { href: "#filter-from", text: t("dateInvalid") },
     page.invalid.pana !== undefined && { href: "#filter-to", text: t("dateInvalid") },
+    page.altInvalid && { href: "#filter-alt", text: t("changesFilterAltInvalid", { act: page.alt }) },
   ].filter((item) => item !== false);
   const refused = problems.length > 0;
   return (

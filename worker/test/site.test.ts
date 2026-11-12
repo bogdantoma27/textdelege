@@ -35,6 +35,7 @@ describe("sitemaps", () => {
     expect(locs(xml)).toEqual([
       "https://textdelege.ro/",
       "https://textdelege.ro/modificari",
+      "https://textdelege.ro/acte",
       "https://textdelege.ro/despre",
       "https://textdelege.ro/legenda",
       "https://textdelege.ro/legislatie",

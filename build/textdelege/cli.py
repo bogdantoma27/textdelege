@@ -31,6 +31,7 @@ from .objects import (
     article_object,
     changes_object,
     law_object,
+    act_index_object,
     manifest_object,
     object_key,
     ruling_object,
@@ -341,6 +342,17 @@ def _iso(value: date | None) -> str | None:
     return value.isoformat() if value else None
 
 
+def act_row(meta: ActMeta, freshness_status: str | None, articles: int) -> dict:
+    return {
+        "path": meta.path, "alias": meta.alias, "slug": meta.slug,
+        "kind": meta.kind, "title": meta.title, "short": meta.short, "status": meta.status,
+        "freshness_status": freshness_status,
+        "year": meta.year, "number": meta.number or None,
+        "from_date": _iso(meta.from_), "latest": _iso(meta.latest),
+        "articles": articles,
+    }
+
+
 def build_outputs(
     repo: GitRepo, data: Extracted, build_id: str, now: datetime, today: date
 ) -> tuple[list[tuple[str, dict]], IndexRows, dict, dict[str, int]]:
@@ -371,11 +383,7 @@ def build_outputs(
             object_key("act", meta.path),
             act_object(meta, articles, act_laws, rulings_for(meta.path, ""), freshness.get(meta.path)),
         ))
-        rows.acts.append({
-            "path": meta.path, "alias": meta.alias, "slug": meta.slug,
-            "kind": meta.kind, "title": meta.title, "short": meta.short, "status": meta.status,
-            "freshness_status": status,
-        })
+        rows.acts.append(act_row(meta, status, len(articles)))
         for position, article in enumerate(articles):
             stem = Path(article.file).stem
             events = events_for(article)
@@ -430,6 +438,7 @@ def build_outputs(
         for path, items in articles_by_act.items()
     }
     status_text = repo.show_file(head, "data/status.json")
+    objects.append((object_key("act-index"), act_index_object(data.metas, stats)))
     manifest = manifest_object(
         build_id, head, now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), counts,
         data.metas, stats, freshness, load_freshness_summary(repo),
