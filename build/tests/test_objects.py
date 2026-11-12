@@ -16,6 +16,7 @@ from build.textdelege.objects import (
     lead,
     manifest_object,
     object_key,
+    articles_by_ruling,
     ruling_object,
 )
 from build.textdelege.rulings import Ruling, Subject
@@ -247,7 +248,7 @@ def build_all() -> dict[str, dict]:
         "article-repealed": build_repealed(),
         "act": act_object(ACT, [article], list(laws.values()), [RULING], FRESHNESS),
         "law": law_object(laws[L200]),
-        "ruling": ruling_object(RULING, {(PATH, "art-1112"): ["ccr-1-2020"]}),
+        "ruling": ruling_object(RULING, articles_by_ruling({(PATH, "art-1112"): ["ccr-1-2020"]})),
         "changes": changes_object(
             PATH, changes_feed(articles, 20, TODAY), upcoming(articles, TODAY)
         ),
@@ -386,7 +387,7 @@ class RulingTest(unittest.TestCase):
             (PATH, "art-1111"): ["ccr-1-2020"],
             ("lege/2010/1", "art-2"): ["ccr-1-2020"],
         }
-        obj = ruling_object(RULING, by_article)
+        obj = ruling_object(RULING, articles_by_ruling(by_article))
         self.assertEqual(
             obj["articles"],
             [
@@ -395,6 +396,14 @@ class RulingTest(unittest.TestCase):
                 {"act_path": "lege/2010/1", "file": "art-2"},
             ],
         )
+        self.assertEqual(
+            articles_by_ruling(by_article),
+            {
+                "ccr-1-2020": [(PATH, "art-1111"), (PATH, "art-1112"), ("lege/2010/1", "art-2")],
+                "ccr-2-2020": [(PATH, "art-1112")],
+            },
+        )
+        self.assertEqual(ruling_object(RULING, {})["articles"], [])
         self.assertEqual(obj["date"], "2020-01-15")
         self.assertEqual(obj["binding_from"], "2020-03-01")
         self.assertEqual(obj["subjects"], [{"act_path": PATH, "articles": ["1112"]}])

@@ -262,7 +262,7 @@ class CloneTest(unittest.TestCase):
         self.assertEqual(repo.head(), new)
         self.assertEqual(repo.show_file(repo.head(), PATH), "c\n")
 
-    def test_prefetch_history_fetches_every_missing_blob_in_one_batch(self):
+    def test_prefetch_blobs_fetches_every_missing_blob_in_one_batch(self):
         for version in "bcd":
             self.commit({PATH: f"{version}\n"})
         self.publish()
@@ -270,36 +270,37 @@ class CloneTest(unittest.TestCase):
         self.assertEqual(len(missing_blobs(repo, PATH)), 4)
         calls, patched = self.count_fetches()
         with patched:
-            fetched = repo.prefetch_history([PATH])
+            fetched = repo.prefetch_blobs(missing_blobs(repo, PATH))
         self.assertEqual(fetched, 4)
         self.assertEqual(len(calls), 1)
         self.assertEqual(missing_blobs(repo, PATH), [])
         self.assertEqual(len(missing_blobs(repo)), 1)
 
-    def test_prefetch_history_does_nothing_when_nothing_is_missing(self):
+    def test_prefetch_blobs_does_nothing_when_nothing_is_missing(self):
         repo = self.clone()
-        repo.prefetch_history([PATH])
+        repo.prefetch_blobs(missing_blobs(repo, PATH))
         calls, patched = self.count_fetches()
         with patched:
-            self.assertEqual(repo.prefetch_history([PATH]), 0)
+            self.assertEqual(repo.prefetch_blobs(missing_blobs(repo, PATH)), 0)
         self.assertEqual(calls, [])
 
-    def test_prefetch_history_accepts_thousands_of_paths(self):
+    def test_prefetch_blobs_ignores_empty_input_and_duplicates(self):
         self.commit({PATH: "b\n"})
         self.publish()
         repo = self.clone()
-        paths = [f"jurisprudenta/ccr/2019/{n}/meta.json" for n in range(5000)] + [PATH]
-        self.assertEqual(repo.prefetch_history(paths), 2)
+        self.assertEqual(repo.prefetch_blobs([]), 0)
+        oids = missing_blobs(repo, PATH)
+        self.assertEqual(repo.prefetch_blobs(oids + oids), 2)
         self.assertEqual(missing_blobs(repo, PATH), [])
 
-    def test_prefetch_history_batches_over_10000(self):
+    def test_prefetch_blobs_batches_over_10000(self):
         for version in "bcd":
             self.commit({PATH: f"{version}\n"})
         self.publish()
         repo = self.clone()
         calls, patched = self.count_fetches()
         with patched, mock.patch.object(gitrepo, "FETCH_BATCH", 2):
-            fetched = repo.prefetch_history([PATH])
+            fetched = repo.prefetch_blobs(missing_blobs(repo, PATH))
         self.assertEqual(fetched, 4)
         self.assertEqual(len(calls), 2)
         self.assertEqual(missing_blobs(repo, PATH), [])

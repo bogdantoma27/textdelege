@@ -1,5 +1,5 @@
 import unittest
-from datetime import date
+from datetime import date, timedelta
 
 from build.textdelege.extract import Article, Line, Version
 from build.textdelege.laws import changes_feed, laws_from, parse_laws_csv, upcoming
@@ -157,6 +157,16 @@ class FeedTest(unittest.TestCase):
         )
         coming = upcoming({"x": [art]}, TODAY)
         self.assertEqual([e["date"] for e in coming], ["2030-01-01", "2031-01-01"])
+
+
+    def test_upcoming_limit_keeps_the_earliest_events(self):
+        versions = [
+            version(date(2030, 1, 1) + timedelta(days=n), None, L200, "L", "(1) A") for n in range(5)
+        ]
+        art = article("art-0001.md", "1", versions)
+        coming = upcoming({"x": [art]}, TODAY, 2)
+        self.assertEqual([e["date"] for e in coming], ["2030-01-01", "2030-01-02"])
+        self.assertEqual(len(upcoming({"x": [art]}, TODAY)), 5)
 
 
 if __name__ == "__main__":

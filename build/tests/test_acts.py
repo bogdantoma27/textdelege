@@ -78,17 +78,50 @@ class SelectTest(unittest.TestCase):
 
     def test_primary_kinds_and_withdrawn_excluded(self):
         withdrawn = row("legea-2-2000", "Codul x", "Codul x", "lege/2000/2", "lege", "in force", withdrawn_by="x")
-        hg = row("hg-1-2000", None, "HG", "hg/2000/1", "hg", "in force")
-        metas = select_acts(acts_json(PLAIN, withdrawn, hg), PATHS, "primary")
+        hg = row("hg-1-2000", None, "HG", "decret/2000/1", "decret", "in force")
+        other = row("hg-2-2000", None, "HG", "hg/2000/2", "hg", "in force")
+        metas = select_acts(acts_json(PLAIN, withdrawn, hg, other), PATHS, "primary")
         slugs = [m.slug for m in metas]
         self.assertIn("legea-1-2000", slugs)
         self.assertIn("hg-1-2000", slugs)
+        self.assertNotIn("hg-2-2000", slugs)
         self.assertNotIn("legea-2-2000", slugs)
-        self.assertNotIn("codul-civil-1864", slugs)
+        self.assertIn("codul-civil-1864", slugs)
         self.assertEqual(slugs[0], "constitutia")
         self.assertIsNone(next(m for m in metas if m.slug == "legea-1-2000").alias)
         withdrawn_codes = select_acts(acts_json(withdrawn), PATHS, "codes")
         self.assertNotIn("legea-2-2000", [m.slug for m in withdrawn_codes])
+
+
+class ConsolidatedSelectionTest(unittest.TestCase):
+    def slugs(self, *extra):
+        return [m.slug for m in select_acts(acts_json(*extra), PATHS, "consolidated")]
+
+    def test_codes_stay_whatever_their_status_and_in_force_primary_acts_join(self):
+        law = row("legea-1-2001", None, None, "lege/2001/1", "lege", "in force")
+        ordinance = row("oug-5-2002", None, None, "oug/2002/5", "oug", "in force")
+        decree = row("decret-lege-1-1990", None, None, "decret-lege/1990/1", "decret-lege", "in force")
+        slugs = self.slugs(law, ordinance, decree)
+        for slug in ("legea-1-2001", "oug-5-2002", "decret-lege-1-1990", "codul-civil-1864", "constitutia"):
+            self.assertIn(slug, slugs)
+
+    def test_repealed_amended_withdrawn_and_other_kinds_are_left_out(self):
+        repealed = row("legea-2-2001", None, None, "lege/2001/2", "lege", "repealed 2010-01-01")
+        amended = row("legea-3-2001", None, None, "lege/2001/3", "lege", "amended, not consolidated")
+        withdrawn = row("legea-4-2001", None, None, "lege/2001/4", "lege", "in force", withdrawn_by="x")
+        order = row("hg-5-2001", None, None, "hg/2001/5", "hg", "in force")
+        decree = row("decret-6-1970", None, None, "decret/1970/6", "decret", "in force")
+        slugs = self.slugs(repealed, amended, withdrawn, order, decree)
+        for slug in ("legea-2-2001", "legea-3-2001", "legea-4-2001", "hg-5-2001", "decret-6-1970"):
+            self.assertNotIn(slug, slugs)
+
+    def test_plain_acts_get_no_alias_and_cannot_collide(self):
+        extra = [
+            row(f"legea-{n}-2001", None, "Legea nr. 1", f"lege/2001/{n}", "lege", "in force")
+            for n in range(10, 14)
+        ]
+        metas = select_acts(acts_json(*extra), PATHS, "consolidated")
+        self.assertTrue(all(m.alias is None for m in metas if m.slug.startswith("legea-1")))
 
 
 class AliasTest(unittest.TestCase):

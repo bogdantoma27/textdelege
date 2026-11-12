@@ -1,6 +1,7 @@
 import gzip
 import hashlib
 import json
+import re
 import sys
 from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -15,7 +16,8 @@ STATEMENT_LIMIT = 100_000
 CONTENT_TYPE = "application/json; charset=utf-8"
 MANIFEST_KEY = "manifest.json"
 SNAPSHOT_KEY = "snapshot.json"
-CHECKPOINT_UNITS = 2000
+CHECKPOINT_UNITS = 20_000
+NEXT_SUFFIX = "_next"
 LEGACY_PREFIX = "b/"
 
 UNIT_COLUMNS = {
@@ -61,6 +63,24 @@ def schema_statements() -> list[str]:
     return statements
 
 
+def next_schema_statements() -> list[str]:
+    statements = []
+    for statement in schema_statements():
+        match = re.match(r"CREATE (?:VIRTUAL )?TABLE IF NOT EXISTS (\w+)", statement)
+        if match and match.group(1) in TABLES:
+            name = match.group(1)
+            statements.append(
+                re.sub(rf"(IF NOT EXISTS ){name}(?=[\s(])", rf"\g<1>{name}{NEXT_SUFFIX}", statement, count=1)
+            )
+    return statements
+
+
+def _next_tables_exist(d1: D1Client) -> bool:
+    names = ", ".join(f"'{table}{NEXT_SUFFIX}'" for table in TABLES)
+    rows = d1.query(f"SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ({names})")
+    return bool(rows)
+
+
 def _subject(table: str, row: dict) -> str:
     act = row.get("act_path") or row.get("path") or row.get("ruling_key") or ""
     name = row.get("file") or row.get("key") or ""
@@ -78,22 +98,22 @@ def fts_rowid(key: str) -> int:
     return int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:8], "big") >> 1
 
 
-def _insert(table: str, row: dict) -> str:
+def _insert(table: str, row: dict, suffix: str = "") -> str:
     columns, values = list(row), [row[column] for column in row]
     if table == "articles_fts":
         columns.insert(0, "rowid")
         values.insert(0, fts_rowid(f"{row['act_path']}|{row['file']}"))
     verb = "INSERT" if table in MULTI_ROW_TABLES else "INSERT OR REPLACE"
-    sql = f"{verb} INTO {table} ({', '.join(columns)}) VALUES ({', '.join('?' * len(columns))})"
+    sql = f"{verb} INTO {table}{suffix} ({', '.join(columns)}) VALUES ({', '.join('?' * len(columns))})"
     return _checked(render_statement(sql, values), _subject(table, row))
 
 
-def _delete(table: str, key: str) -> str:
+def _delete(table: str, key: str, suffix: str = "") -> str:
     if table == "articles_fts":
-        return _checked(render_statement(f"DELETE FROM {table} WHERE rowid = ?", [fts_rowid(key)]), f"{table} unit {key}")
+        return _checked(render_statement(f"DELETE FROM {table}{suffix} WHERE rowid = ?", [fts_rowid(key)]), f"{table} unit {key}")
     columns = UNIT_COLUMNS[table]
     values = [int(part) if column in INTEGER_COLUMNS else part for column, part in zip(columns, key.split("|"))]
-    sql = f"DELETE FROM {table} WHERE " + " AND ".join(f"{column} = ?" for column in columns)
+    sql = f"DELETE FROM {table}{suffix} WHERE " + " AND ".join(f"{column} = ?" for column in columns)
     return _checked(render_statement(sql, values), f"{table} unit {key}")
 
 
@@ -209,8 +229,12 @@ def publish(
     d1: D1Client,
 ) -> str:
     previous = read_snapshot(r2)
-    full = previous is None
-    snapshot = empty_snapshot() if full else previous
+    fresh = previous is None
+    snapshot = empty_snapshot() if fresh else previous
+    if snapshot.pop("swapping", False) and not _next_tables_exist(d1):
+        snapshot["swapped"] = True
+    full = fresh or (snapshot["build"] is None and not snapshot.get("swapped"))
+    suffix = NEXT_SUFFIX if full else ""
 
     new_objects = dict(objects)
     object_hashes = {key: digest(obj) for key, obj in new_objects.items()}
@@ -233,12 +257,12 @@ def publish(
     live_build = manifest["build"] if changed else snapshot["build"]
 
     def rewritten(table: str, key: str) -> list[str]:
-        inserts = [_insert(table, row) for row in units[table][key]]
-        return [_delete(table, key), *inserts] if table in MULTI_ROW_TABLES else inserts
+        inserts = [_insert(table, row, suffix) for row in units[table][key]]
+        return [_delete(table, key, suffix), *inserts] if table in MULTI_ROW_TABLES else inserts
 
     statements: dict[str, dict[str, list[str]]] = {
         table: {
-            **{key: [_delete(table, key)] for key in remove[table]},
+            **{key: [_delete(table, key, suffix)] for key in remove[table]},
             **{key: rewritten(table, key) for key in rewrite[table]},
         }
         for table in TABLES
@@ -249,8 +273,13 @@ def publish(
 
     schema = [render_statement(statement, []) for statement in schema_statements()]
     if full:
-        d1.execute_batch([f"DROP TABLE IF EXISTS {table}" for table in TABLES] + schema)
-        save()
+        staging = [render_statement(statement, []) for statement in next_schema_statements()]
+        if fresh:
+            drops = [f"DROP TABLE IF EXISTS {table}{suffix}" for table in TABLES]
+            d1.execute_batch(drops + schema[:1] + staging)
+            save()
+        else:
+            d1.execute_batch(schema[:1] + staging)
     else:
         d1.execute_batch(schema)
 
@@ -285,10 +314,23 @@ def publish(
         if done:
             flush()
 
+    if full:
+        snapshot["swapping"] = True
+        save()
+        swap = []
+        for table in TABLES:
+            swap.append(f"DROP TABLE IF EXISTS {table}")
+            swap.append(f"ALTER TABLE {table}{suffix} RENAME TO {table}")
+        d1.execute_batch(swap + schema)
+        snapshot.pop("swapping", None)
+        snapshot["swapped"] = True
+        save()
+
     if live_build != snapshot["build"] or not _manifest_is_current(r2, manifest):
         _upload(r2, MANIFEST_KEY, {**manifest, "build": live_build})
     if live_build != snapshot["build"]:
         snapshot["build"] = live_build
+        snapshot.pop("swapped", None)
         save()
 
     state["build"] = live_build

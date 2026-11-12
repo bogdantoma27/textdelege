@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+SELECTIONS = ("codes", "primary", "consolidated")
 DEFAULT_SOURCE_URL = "https://github.com/lexifina/romania-law"
 
 
@@ -26,10 +27,12 @@ class D1Config:
 @dataclass(frozen=True)
 class Config:
     source_url: str
-    selection: Literal["codes", "primary"]
+    selection: Literal["codes", "primary", "consolidated"]
     cache_dir: Path
     r2: R2Config | None
     d1: D1Config | None
+    time_budget_minutes: float | None = None
+    workers: int | None = None
 
 
 def _section(data: dict, name: str, keys: tuple[str, ...], env: Mapping[str, str]):
@@ -48,7 +51,7 @@ def load_config(path: Path, env: Mapping[str, str] = os.environ) -> Config:
     path = Path(path).resolve()
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     selection = data.get("selection", "codes")
-    if selection not in ("codes", "primary"):
+    if selection not in SELECTIONS:
         raise ValueError(f"unknown selection: {selection!r}")
     r2 = _section(
         data, "r2",
@@ -61,4 +64,6 @@ def load_config(path: Path, env: Mapping[str, str] = os.environ) -> Config:
         cache_dir=(path.parent / data.get("cache_dir", ".cache")).resolve(),
         r2=R2Config(*r2) if r2 else None,
         d1=D1Config(*d1) if d1 else None,
+        time_budget_minutes=data.get("time_budget_minutes"),
+        workers=data.get("workers"),
     )

@@ -162,6 +162,7 @@ class RoundTripTest(unittest.TestCase):
 
 class IncrementalBuildTest(unittest.TestCase):
     def setUp(self):
+        self.after_first = None
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.tmp = Path(tmp.name)
@@ -277,6 +278,278 @@ class IncrementalBuildTest(unittest.TestCase):
         argv = ["verify", "--config", str(self.config), *SAMPLE]
         self.assertEqual(run(argv)[0], 0)
         self.assertFalse((self.cache / extractcache.CACHE_DIR).exists())
+
+    def run_build(self, *extra, config=None, **injections):
+        self.day = TODAY + timedelta(days=1)
+        injections.setdefault("today", self.day)
+        calls = []
+        real = cli.extract_core
+
+        def counting(repo, folder, *args, **kwargs):
+            calls.append(folder)
+            result = real(repo, folder, *args, **kwargs)
+            if self.after_first:
+                self.after_first()
+            return result
+
+        with mock.patch.object(cli, "extract_core", side_effect=counting):
+            code, stdout, stderr = run(
+                ["build", "--config", str(config or self.config), *SAMPLE, *extra], **injections
+            )
+        return code, stdout, stderr, sorted(calls)
+
+    def other_config(self, name):
+        config = self.tmp / "work" / name
+        config.write_text(
+            self.config.read_text(encoding="utf-8").replace(".cache", f".{name}"), encoding="utf-8"
+        )
+        return config, self.tmp / "work" / f".{name}"
+
+    def entries(self, cache):
+        directory = cache / extractcache.CACHE_DIR
+        return sorted(p.name for p in directory.glob("*.json")) if directory.exists() else []
+
+    def outputs(self, cache):
+        root = cache / "out"
+        return {
+            path.relative_to(root): path.read_bytes()
+            for path in root.rglob("*")
+            if path.is_file() and path.name != "manifest.json"
+        }
+
+    def budget_ends_after_the_first_act(self):
+        offset = [0]
+        real_clock = cli.time.monotonic
+        self.after_first = lambda: offset.__setitem__(0, 10_000)
+        return mock.patch.object(cli.time, "monotonic", side_effect=lambda: real_clock() + offset[0])
+
+    def test_a_zero_budget_extracts_nothing_publishes_nothing_and_exits_0(self):
+        r2, d1 = RecordingR2(), RecordingD1()
+        code, stdout, stderr, calls = self.run_build("--time-budget", "0", r2=r2, d1=d1)
+        self.assertEqual((code, stderr, calls), (0, "", []), stdout)
+        self.assertIn("Incomplete: 0 of 2 acts extracted; run again to continue", stdout)
+        self.assertTrue(all(key.startswith("build-cache/") for key in r2.puts))
+        self.assertFalse(any("INSERT INTO meta" in q for q in d1.queries))
+        self.assertEqual(d1.batches, [])
+        self.assertFalse((self.cache / "state.json").exists())
+
+    def test_a_budget_used_up_midway_stores_what_was_done_and_the_next_run_finishes(self):
+        r2, d1 = RecordingR2(), RecordingD1()
+        with self.budget_ends_after_the_first_act():
+            code, stdout, stderr, calls = self.run_build(
+                "--time-budget", "5", "--workers", "1", r2=r2, d1=d1
+            )
+        self.after_first = None
+        self.assertEqual((code, stderr, len(calls)), (0, "", 1), stdout)
+        self.assertIn("Incomplete: 1 of 2 acts extracted; run again to continue", stdout)
+        self.assertFalse((self.cache / "out").exists())
+        self.assertFalse((self.cache / "state.json").exists())
+        self.assertEqual(len(self.entries(self.cache)), 1)
+        self.assertTrue(all(key.startswith("build-cache/") for key in r2.puts))
+        self.assertEqual(d1.batches, [])
+
+        code, stdout, stderr, calls = self.run_build("--dry-run")
+        self.assertEqual((code, stderr, len(calls)), (0, "", 1), stdout)
+        resumed = self.outputs(self.cache)
+
+        config, cache = self.other_config("single.toml")
+        code, stdout, stderr, calls = self.run_build("--dry-run", config=config)
+        self.assertEqual((code, stderr, len(calls)), (0, "", 2), stdout)
+        self.assertEqual(resumed, self.outputs(cache))
+
+    def test_config_time_budget_applies(self):
+        self.config.write_text(
+            self.config.read_text(encoding="utf-8") + "time_budget_minutes = 0\n", encoding="utf-8"
+        )
+        code, stdout, stderr, calls = self.run_build("--dry-run")
+        self.assertEqual((code, calls), (0, []), stderr)
+        self.assertIn("Incomplete: 0 of 2", stdout)
+
+    def test_a_failed_verification_in_an_incomplete_run_exits_1_and_stores_nothing(self):
+        with self.budget_ends_after_the_first_act():
+            code, _stdout, _stderr, _calls = self.run_build(
+                "--time-budget", "5", "--workers", "1", "--dry-run", oracle=lambda s: "text that differs\n"
+            )
+        self.after_first = None
+        self.assertEqual(code, 1)
+        self.assertEqual(self.entries(self.cache), [])
+
+    def prefetch_calls(self, *extra, **injections):
+        calls = []
+        real = cli.GitRepo.prefetch_blobs
+
+        def recording(repo, paths):
+            calls.append(list(paths))
+            return real(repo, paths)
+
+        with mock.patch.object(cli.GitRepo, "prefetch_blobs", recording):
+            code, stdout, stderr, _ = self.run_build("--dry-run", *extra, **injections)
+        self.assertEqual((code, stderr), (0, ""), stdout)
+        return calls, stdout
+
+    def test_each_act_prefetches_its_own_history_only_when_it_is_extracted(self):
+        calls, stdout = self.prefetch_calls()
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(all(calls))
+        self.assertRegex(stdout, r"Prefetched: [1-9]\d* history blobs")
+        calls, stdout = self.prefetch_calls(today=TODAY + timedelta(days=9))
+        self.assertEqual(calls, [])
+        self.assertIn("Prefetched: 0 history blobs", stdout)
+
+    def test_a_used_up_budget_prefetches_nothing(self):
+        calls = []
+        with mock.patch.object(cli.GitRepo, "prefetch_blobs", lambda repo, paths: calls.append(paths)):
+            code, stdout, _stderr, _ = self.run_build("--dry-run", "--time-budget", "0")
+        self.assertEqual((code, calls), (0, []), stdout)
+
+    def test_a_budget_ending_after_the_first_act_prefetches_only_that_act(self):
+        calls = []
+        real = cli.GitRepo.prefetch_blobs
+
+        def recording(repo, paths):
+            calls.append(paths)
+            return real(repo, paths)
+
+        with mock.patch.object(cli.GitRepo, "prefetch_blobs", recording),                 self.budget_ends_after_the_first_act():
+            code, _stdout, _stderr, _ = self.run_build(
+                "--dry-run", "--time-budget", "5", "--workers", "1"
+            )
+        self.after_first = None
+        self.assertEqual((code, len(calls)), (0, 1))
+
+    def test_one_and_four_workers_produce_identical_outputs(self):
+        outputs = []
+        for workers in ("1", "4"):
+            config, cache = self.other_config(f"w{workers}.toml")
+            code, stdout, stderr, calls = self.run_build(
+                "--workers", workers, "--dry-run", config=config
+            )
+            self.assertEqual((code, stderr, len(calls)), (0, "", 2), stdout)
+            outputs.append(self.outputs(cache))
+        self.assertEqual(outputs[0], outputs[1])
+        self.assertTrue(outputs[0])
+
+
+class RecordingR2:
+    def __init__(self):
+        self.puts, self.log = {}, []
+
+    def get(self, key):
+        self.log.append(("get", key))
+        return self.puts.get(key)
+
+    def list(self, prefix):
+        return []
+
+    def put(self, key, body, content_type, content_encoding=None):
+        self.log.append(("put", key))
+        self.puts[key] = body
+
+    def delete_prefix(self, prefix):
+        self.log.append(("delete_prefix", prefix))
+        for key in [k for k in self.puts if k.startswith(prefix)]:
+            del self.puts[key]
+        return 0
+
+
+class RecordingD1:
+    def __init__(self):
+        self.queries, self.batches = [], []
+
+    def execute_batch(self, statements):
+        self.batches.append(list(statements))
+
+    def query(self, sql, params=None):
+        self.queries.append(" ".join(sql.split()))
+        return []
+
+
+class RemoteCacheTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = Path(tmp.name)
+        self.r2 = RecordingR2()
+        source = FixtureRepo(self.tmp / "src")
+        source.commit(
+            {f"{FOLDER}/art-0001.md": article(1, "(1) Text.")}, author=LAW_A,
+            trailers={"Kind": "amendment", "Law": LAW_A, "In-force": "2020-01-01"}, message="A",
+        )
+        self.cores = extract_core(GitRepo(self.tmp / "src"), FOLDER, None, credits={}, law_labels={})
+        self.key = "act/path"
+
+    def puts(self):
+        return [call for call in self.r2.log if call[0] == "put"]
+
+    def config(self):
+        source = SourceRepo(self.tmp / "source")
+        config = self.tmp / "config.toml"
+        config.write_text(
+            f'source_url = "{source.uri}"\nselection = "codes"\ncache_dir = ".cache"\n', encoding="utf-8"
+        )
+        return config
+
+    def test_store_uploads_once_and_an_unchanged_store_does_not_upload_again(self):
+        cache = self.tmp / "a"
+        extractcache.store(cache, self.key, "fp", self.cores, self.r2)
+        extractcache.store(cache, self.key, "fp", self.cores, self.r2)
+        self.assertEqual(self.puts(), [("put", "build-cache/extract/act_path.json.gz")])
+        extractcache.store(cache, self.key, "fp2", self.cores, self.r2)
+        self.assertEqual(len(self.puts()), 2)
+
+    def test_an_empty_local_cache_loads_from_remote_and_keeps_a_local_copy(self):
+        extractcache.store(self.tmp / "a", self.key, "fp", self.cores, self.r2)
+        fresh = self.tmp / "b"
+        loaded = extractcache.load(fresh, self.key, "fp", self.r2)
+        self.assertEqual(extractcache.encode_cores(loaded), extractcache.encode_cores(self.cores))
+        self.assertTrue(extractcache.cache_path(fresh, self.key).exists())
+        before = len(self.r2.log)
+        self.assertIsNotNone(extractcache.load(fresh, self.key, "fp", self.r2))
+        self.assertEqual(len(self.r2.log), before)
+        extractcache.store(fresh, self.key, "fp", loaded, self.r2)
+        self.assertEqual(len(self.puts()), 1)
+
+    def test_a_wrong_fingerprint_remotely_is_a_miss(self):
+        extractcache.store(self.tmp / "a", self.key, "fp", self.cores, self.r2)
+        self.assertIsNone(extractcache.load(self.tmp / "b", self.key, "other", self.r2))
+        self.assertFalse(extractcache.cache_path(self.tmp / "b", self.key).exists())
+
+    def test_a_stale_local_entry_falls_back_to_the_remote_one(self):
+        extractcache.store(self.tmp / "a", self.key, "fp", self.cores, self.r2)
+        extractcache.store(self.tmp / "b", self.key, "old", self.cores)
+        self.assertIsNotNone(extractcache.load(self.tmp / "b", self.key, "fp", self.r2))
+
+    def test_a_corrupt_remote_entry_is_a_miss(self):
+        self.r2.puts[extractcache.remote_key(self.key)] = b"not gzip"
+        self.assertIsNone(extractcache.load(self.tmp / "b", self.key, "fp", self.r2))
+
+    def test_wipe_clears_both_sides(self):
+        cache = self.tmp / "a"
+        extractcache.store(cache, self.key, "fp", self.cores, self.r2)
+        extractcache.wipe(cache, self.r2)
+        self.assertFalse((cache / extractcache.CACHE_DIR).exists())
+        self.assertEqual(self.r2.puts, {})
+        self.assertIn(("delete_prefix", "build-cache/extract/"), self.r2.log)
+
+    def test_without_a_client_nothing_is_remote(self):
+        cache = self.tmp / "a"
+        extractcache.store(cache, self.key, "fp", self.cores)
+        extractcache.wipe(cache)
+        self.assertEqual(self.r2.log, [])
+
+    def test_dry_run_never_touches_the_bucket(self):
+        code, _out, _err = run(["build", "--config", str(self.config()), "--dry-run", *SAMPLE], r2=self.r2)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.r2.log, [])
+
+    def test_a_publishing_build_uploads_entries_under_the_cache_prefix(self):
+        code, _out, _err = run(
+            ["build", "--config", str(self.config()), *SAMPLE], r2=self.r2, d1=RecordingD1()
+        )
+        self.assertEqual(code, 0)
+        cached = [key for key in self.r2.puts if key.startswith("build-cache/extract/")]
+        self.assertEqual(len(cached), 2)
+        self.assertIn("manifest.json", self.r2.puts)
 
 
 def make_articles(acts, count=3):

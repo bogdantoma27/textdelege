@@ -2,6 +2,7 @@ import os
 import shutil
 import stat
 import subprocess
+import threading
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
@@ -169,11 +170,15 @@ class BlobReader:
 class GitRepo:
     def __init__(self, path: Path):
         self.path = Path(path).resolve()
+        self._fetch_lock = threading.Lock()
+        self.history = None
 
     def _git(self, *args: str) -> str:
         return _run_checked(list(args), self.path)
 
     def log(self, paths: list[str]) -> list[Commit]:
+        if self.history is not None and self.history.covers(paths):
+            return self.history.log(self, paths)
         output = self._git("log", "--no-merges", f"--format={LOG_FORMAT}", "--", *paths)
         return [
             _parse_commit(record.strip("\n"))
@@ -182,10 +187,14 @@ class GitRepo:
         ]
 
     def newest_commit(self, paths: list[str]) -> str | None:
+        if self.history is not None and self.history.covers(paths):
+            return self.history.newest_commit(self, paths)
         output = self._git("log", "--no-merges", "-n", "1", "--format=%H", "--", *paths)
         return output.strip() or None
 
     def log_with_paths(self, paths: list[str]) -> list[tuple[Commit, set[str]]]:
+        if self.history is not None and self.history.covers(paths):
+            return self.history.log_with_paths(self, paths)
         output = self._git(
             "-c",
             "core.quotepath=false",
@@ -270,13 +279,17 @@ class GitRepo:
         self._git("fetch", "--filter=blob:none", "origin", "main")
         self._git("update-ref", "refs/heads/main", "refs/remotes/origin/main")
 
-    def prefetch_history(self, paths: list[str]) -> int:
-        listing = _run_checked(
-            ["rev-list", "--objects", "--missing=print", "--stdin"],
+    def prefetch_blobs(self, oids: list[str]) -> int:
+        unique = list(dict.fromkeys(oids))
+        if not unique:
+            return 0
+        checked = _run_checked(
+            ["cat-file", "--batch-check"],
             self.path,
-            "\n".join(["HEAD", "--", *paths]) + "\n",
+            "\n".join(unique) + "\n",
+            {"GIT_NO_LAZY_FETCH": "1"},
         )
-        missing = [line[1:] for line in listing.splitlines() if line.startswith("?")]
+        missing = [line.split()[0] for line in checked.splitlines() if line.endswith(" missing")]
         return self._fetch_blobs(missing)
 
     def prefetch_head(self, paths: list[str]) -> int:
@@ -311,6 +324,11 @@ class GitRepo:
         return any("/".join(parts[:end]) in wanted for end in range(1, len(parts)))
 
     def _fetch_blobs(self, oids: list[str]) -> int:
+        with self._fetch_lock:
+            self._fetch_batches(oids)
+        return len(oids)
+
+    def _fetch_batches(self, oids: list[str]) -> None:
         for start in range(0, len(oids), FETCH_BATCH):
             batch = oids[start : start + FETCH_BATCH]
             _run_checked(

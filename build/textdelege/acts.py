@@ -4,7 +4,12 @@ from dataclasses import dataclass, replace
 from datetime import date
 from typing import Literal
 
-PRIMARY_KINDS = ("constitutie", "lege", "oug", "og", "hg")
+PRIMARY_KINDS = (
+    "constitutie", "lege", "oug", "og", "decret", "decret-lege", "hotarare-parlament", "cod", "alte",
+)
+CONSOLIDATED_KINDS = (
+    "lege", "oug", "og", "decret-lege", "hotarare-parlament", "cod", "constitutie",
+)
 DROPPED_WORDS = {"de", "al", "romaniei"}
 IN_FORCE = "in force"
 
@@ -101,7 +106,7 @@ def old_folder_for(meta: ActMeta, paths_json: dict) -> str | None:
 
 
 def select_acts(
-    acts_json: dict, paths_json: dict, selection: Literal["codes", "primary"]
+    acts_json: dict, paths_json: dict, selection: Literal["codes", "primary", "consolidated"]
 ) -> list[ActMeta]:
     metas = []
     for r in acts_json["acts"]:
@@ -109,6 +114,12 @@ def select_acts(
             continue
         if selection == "codes":
             wanted = bool(r.get("code")) or r["kind"] == "constitutie"
+        elif selection == "consolidated":
+            wanted = (
+                bool(r.get("code"))
+                or r["kind"] == "constitutie"
+                or (r["status"] == IN_FORCE and r["kind"] in CONSOLIDATED_KINDS)
+            )
         elif selection == "primary":
             wanted = r["kind"] in PRIMARY_KINDS
         else:

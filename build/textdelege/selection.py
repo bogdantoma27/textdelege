@@ -66,3 +66,13 @@ def tree_for_day(
     old_folder: str | None,
 ) -> dict[str, str]:
     return tree_and_folder_for_day(repo, commits, day, folder, old_folder)[0]
+
+
+def act_blob_ids(repo: GitRepo, folder: str, old_folder: str | None) -> list[str]:
+    commits = act_commits(repo, folder, old_folder)
+    blobs: dict[str, None] = {}
+    for day in in_force_days(commits):
+        tree, _used = tree_and_folder_for_day(repo, commits, day, folder, old_folder)
+        for blob in tree.values():
+            blobs[blob] = None
+    return list(blobs)

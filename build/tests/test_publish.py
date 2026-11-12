@@ -165,14 +165,16 @@ class PublishTest(unittest.TestCase):
     def puts(self, start=0):
         return [call[1] for call in self.log[start:] if call[0] == "put"]
 
-    def test_full_mode_drops_and_recreates_tables_then_writes_an_empty_snapshot_before_rows(self):
+    def test_full_mode_builds_next_tables_then_writes_an_empty_snapshot_before_rows(self):
         self.assertEqual(self.run_publish(), FIRST)
         first = self.d1.batches[0]
         drops = [s for s in first if s.startswith("DROP")]
-        self.assertEqual(drops, [f"DROP TABLE IF EXISTS {t}" for t in TABLES])
-        self.assertNotIn("DROP TABLE IF EXISTS meta", first)
+        self.assertEqual(drops, [f"DROP TABLE IF EXISTS {t}_next" for t in TABLES])
         self.assertIn("CREATE TABLE IF NOT EXISTS meta", first[len(drops)])
-        self.assertTrue(all(s.startswith("CREATE") for s in first[len(drops):]))
+        creates = first[len(drops) + 1:]
+        self.assertEqual(len(creates), len(TABLES))
+        self.assertTrue(all("_next" in s.splitlines()[0] for s in creates))
+        self.assertFalse(any(s.startswith("CREATE INDEX") for s in first))
         empty = self.r2.snapshots[0]
         self.assertEqual(
             empty,
@@ -356,10 +358,84 @@ class PublishTest(unittest.TestCase):
         self.assertFalse(any(" acts" in s or "articles " in s or "versions" in s for s in statements))
         self.assertEqual(len([s for s in statements if s.startswith("INSERT INTO events")]), 5)
         self.assertEqual(len([s for s in statements if s.startswith("INSERT OR REPLACE INTO articles_fts")]), 5)
-        self.assertFalse(any(s.startswith("DROP") for b in healthy.batches for s in b))
+        self.assertFalse(any(s.startswith("DROP") and s.endswith("_next") for b in healthy.batches for s in b))
         self.assertEqual([p for p in self.puts() if p.startswith("acts/")], [])
         self.assertEqual(self.r2.read(SNAPSHOT_KEY)["build"], SECOND)
         self.assertEqual(self.r2.read("manifest.json")["build"], SECOND)
+
+    def test_interrupted_full_publish_leaves_the_live_tables_intact_and_resumes_into_next(self):
+        d1, r2 = SqliteD1(), FakeR2([])
+        objects, rows = dataset(BASE)
+        publish(objects, rows, manifest(FIRST), state(), r2, d1)
+        r2.store.pop(SNAPSHOT_KEY)
+        newer = {**BASE, 6: ["six"]}
+        objects, rows = dataset(newer)
+
+        class Interrupting(SqliteD1):
+            def __init__(self, db):
+                self.db = db
+
+            def execute_batch(self, statements):
+                if any(s.startswith("INSERT OR REPLACE INTO articles_fts_next") for s in statements):
+                    raise RuntimeError("D1 down")
+                super().execute_batch(statements)
+
+        with mock.patch.object(publish_module, "CHECKPOINT_UNITS", 2), self.assertRaises(RuntimeError):
+            publish(objects, rows, manifest(SECOND), state(), r2, Interrupting(d1.db))
+        self.assertEqual([d1.count(t) for t in ("acts", "articles", "versions", "events", "articles_fts")],
+                         [1, 5, 5, 5, 5])
+        self.assertEqual(d1.count("articles_next"), 6)
+        self.assertEqual(d1.count("articles_fts_next"), 0)
+        self.assertIsNone(r2.read(SNAPSHOT_KEY)["build"])
+
+        publish(objects, rows, manifest(SECOND), state(), r2, d1)
+        self.assertEqual([d1.count(t) for t in ("acts", "articles", "versions", "events", "articles_fts")],
+                         [1, 6, 6, 6, 6])
+        tables = {row["name"] for row in d1.query("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        self.assertFalse(any(name.endswith("_next") for name in tables))
+        indexes = {row["name"] for row in d1.query("SELECT name FROM sqlite_master WHERE type = 'index'")}
+        self.assertIn("events_by_date", indexes)
+        self.assertEqual(
+            d1.query("SELECT file FROM articles_fts WHERE articles_fts MATCH 'six'"), [{"file": "art-0006"}]
+        )
+        self.assertEqual(r2.read(SNAPSHOT_KEY)["build"], SECOND)
+        self.assertNotIn("swapped", r2.read(SNAPSHOT_KEY))
+
+    def test_a_crash_right_after_the_swap_keeps_the_swapped_tables(self):
+        d1, r2 = SqliteD1(), FakeR2([])
+        objects, rows = dataset(BASE)
+        publish(objects, rows, manifest(FIRST), state(), r2, d1)
+        r2.store.pop(SNAPSHOT_KEY)
+        newer = {**BASE, 6: ["six"]}
+        objects, rows = dataset(newer)
+
+        class CrashAfterSwap(SqliteD1):
+            def __init__(self, db):
+                self.db = db
+
+            def execute_batch(self, statements):
+                super().execute_batch(statements)
+                if any(s.startswith("ALTER TABLE") for s in statements):
+                    raise RuntimeError("runner killed")
+
+        with self.assertRaises(RuntimeError):
+            publish(objects, rows, manifest(SECOND), state(), r2, CrashAfterSwap(d1.db))
+        self.assertEqual(d1.count("articles"), 6)
+        self.assertTrue(r2.read(SNAPSHOT_KEY)["swapping"])
+
+        publish(objects, rows, manifest(SECOND), state(), r2, d1)
+        self.assertEqual([d1.count(t) for t in ("acts", "articles", "versions", "events", "articles_fts")],
+                         [1, 6, 6, 6, 6])
+        self.assertEqual(r2.read(SNAPSHOT_KEY)["build"], SECOND)
+        self.assertNotIn("swapping", r2.read(SNAPSHOT_KEY))
+
+    def test_a_second_full_publish_after_a_swap_keeps_working(self):
+        d1, r2 = SqliteD1(), FakeR2([])
+        objects, rows = dataset(BASE)
+        publish(objects, rows, manifest(FIRST), state(), r2, d1)
+        r2.store.pop(SNAPSHOT_KEY)
+        publish(objects, rows, manifest(SECOND), state(), r2, d1)
+        self.assertEqual([d1.count(t) for t in ("acts", "articles", "articles_fts")], [1, 5, 5])
 
     def test_quota_error_propagates_and_keeps_the_checkpoint(self):
         quota = D1QuotaExceeded("D1 query failed: daily write limit exceeded")

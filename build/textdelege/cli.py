@@ -15,7 +15,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import extractcache
+from . import extractcache, historyindex
 from .acts import ActMeta, old_folder_for, select_acts
 from .config import Config, load_config
 from .d1 import SCHEMA_VERSION, D1Client, D1Error, D1QuotaExceeded
@@ -23,9 +23,11 @@ from .events import events_for
 from .extract import Article, extract_core, finalize_act, version_on
 from .freshness import INDEX, load_freshness, load_freshness_summary, shard_files
 from .gitrepo import GitError, GitRepo, remove_tree
+from .selection import act_blob_ids
 from .laws import changes_feed, laws_from, parse_laws_csv, upcoming
 from .objects import (
     act_object,
+    articles_by_ruling,
     article_object,
     changes_object,
     law_object,
@@ -87,6 +89,7 @@ class Extracted:
     head_blobs: int = 0
     fresh_acts: set[str] | None = None
     pending_cache: list[tuple[str, str, list]] = field(default_factory=list)
+    missing: int = 0
     timings: dict[str, float] = field(default_factory=dict)
 
 
@@ -191,8 +194,19 @@ def _require(repo: GitRepo, head: str, path: str) -> str:
     return text
 
 
+def default_workers() -> int:
+    return max(1, os.cpu_count() or 1)
+
+
 def extract_source(
-    repo: GitRepo, config: Config, today: date, *, use_cache: bool = False
+    repo: GitRepo,
+    config: Config,
+    today: date,
+    *,
+    use_cache: bool = False,
+    deadline: float | None = None,
+    workers: int = 1,
+    r2=None,
 ) -> Extracted:
     fetch_started = time.monotonic()
     head = repo.head()
@@ -203,12 +217,10 @@ def extract_source(
     if not metas:
         raise PipelineError(f"no acts selected with selection = {config.selection!r}")
     old_folders = {meta.path: old_folder_for(meta, paths_json) for meta in metas}
-    act_folders = []
-    for meta in metas:
-        act_folders.append(meta.path)
-        if old_folders[meta.path]:
-            act_folders.append(old_folders[meta.path])
-    history_blobs = repo.prefetch_history(act_folders)
+    if repo.history is None:
+        repo.history = historyindex.ensure(
+            repo, config.cache_dir, historyindex.folders_for(acts_json, paths_json), r2
+        )
     head_blobs += repo.prefetch_head([*DATA_FILES, READER])
     freshness_index = repo.show_file(head, INDEX)
     shards = shard_files(json.loads(freshness_index), metas) if freshness_index else []
@@ -245,27 +257,67 @@ def extract_source(
                 metas,
             )):
                 newest[meta.path] = sha
+    cached: dict[str, list] = {}
+    keys: dict[str, str] = {}
+    credits_of: dict[str, dict] = {}
     for meta in metas:
-        act_credits = {**credits.get(meta.slug, {}), **credits.get(meta.path, {})}
-        cores = None
+        credits_of[meta.path] = {**credits.get(meta.slug, {}), **credits.get(meta.path, {})}
         if use_cache:
-            key = extractcache.act_fingerprint(
+            keys[meta.path] = extractcache.act_fingerprint(
                 newest_commit=newest[meta.path],
                 folders=[meta.path] + ([old_folders[meta.path]] if old_folders[meta.path] else []),
-                credits=act_credits,
+                credits=credits_of[meta.path],
                 law_labels=labels,
                 code=code,
             )
-            cores = extractcache.load(config.cache_dir, meta.path, key)
+    if use_cache:
+        with ThreadPoolExecutor(max_workers=max(NEWEST_WORKERS, workers)) as pool:
+            for meta, loaded in zip(metas, pool.map(
+                lambda m: extractcache.load(config.cache_dir, m.path, keys[m.path], r2), metas
+            )):
+                if loaded is not None:
+                    cached[meta.path] = loaded
+    todo = [meta for meta in metas if meta.path not in cached]
+
+    def work(meta: ActMeta):
+        if deadline is not None and time.monotonic() >= deadline:
+            return None
+        blobs = repo.prefetch_blobs(act_blob_ids(repo, meta.path, old_folders[meta.path]))
+        cores = extract_core(
+            repo, meta.path, old_folders[meta.path],
+            credits=credits_of[meta.path], law_labels=labels,
+        )
+        return cores, blobs
+
+    extracted: dict[str, list] = {}
+    history_blobs = 0
+    pool = ThreadPoolExecutor(max_workers=max(1, workers))
+    try:
+        futures = [(meta, pool.submit(work, meta)) for meta in todo]
+        for meta, future in futures:
+            result = future.result()
+            if result is not None:
+                extracted[meta.path], blobs = result
+                history_blobs += blobs
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
+    for meta in metas:
+        cores = cached.get(meta.path)
         if cores is None:
-            cores = extract_core(
-                repo, meta.path, old_folders[meta.path],
-                credits=act_credits, law_labels=labels,
-            )
+            cores = extracted.get(meta.path)
+            if cores is None:
+                continue
             fresh.add(meta.path)
             if use_cache:
-                pending.append((meta.path, key, cores))
+                pending.append((meta.path, keys[meta.path], cores))
         articles_by_act[meta.path] = finalize_act(cores, today)
+    missing = len(metas) - len(articles_by_act)
+    if missing:
+        return Extracted(
+            metas, old_folders, articles_by_act, laws_csv, rulings_by_provision, [],
+            history_blobs, head_blobs, fresh_acts=fresh, pending_cache=pending, missing=missing,
+            timings={"fetch": fetch_seconds, "extract": time.monotonic() - extract_started},
+        )
     rulings, warnings = load_rulings(repo, selected, rulings_by_provision, decisions_csv)
     for warning in warnings:
         print(f"warning: {warning}", file=sys.stderr)
@@ -303,11 +355,17 @@ def build_outputs(
     def rulings_for(path: str, stem: str) -> list[Ruling]:
         return [ruling_by_key[k] for k in by_article.get((path, stem), []) if k in ruling_by_key]
 
+    laws_by_act: dict[str, list] = {}
+    for law in laws.values():
+        for path in dict.fromkeys(change.act_path for change in law.changes):
+            laws_by_act.setdefault(path, []).append(law)
+    articles_of = articles_by_ruling(by_article)
+
     objects: list[tuple[str, dict]] = []
     rows = IndexRows()
     for meta in data.metas:
         articles = articles_by_act[meta.path]
-        act_laws = [law for law in laws.values() if any(c.act_path == meta.path for c in law.changes)]
+        act_laws = laws_by_act.get(meta.path, [])
         status = (freshness.get(meta.path) or {}).get("status")
         objects.append((
             object_key("act", meta.path),
@@ -343,7 +401,7 @@ def build_outputs(
             "published": _iso(law.published),
         })
     for ruling in data.rulings:
-        objects.append((object_key("ruling", ruling.key), ruling_object(ruling, by_article)))
+        objects.append((object_key("ruling", ruling.key), ruling_object(ruling, articles_of)))
         rows.rulings.append({
             "key": ruling.key, "label": ruling.label, "court": ruling.court,
             "date": _iso(ruling.date), "outcome": ruling.outcome,
@@ -357,7 +415,7 @@ def build_outputs(
     objects.append((
         object_key("changes-site"),
         changes_object(
-            "site", changes_feed(articles_by_act, FEED_LIMIT, today), upcoming(articles_by_act, today)
+            "site", changes_feed(articles_by_act, FEED_LIMIT, today), upcoming(articles_by_act, today, FEED_LIMIT)
         ),
     ))
     counts = {
@@ -474,7 +532,8 @@ def cmd_build(args, *, today, now, oracle, r2, d1) -> int:
     state = read_state(config, d1)
     repo, rewritten, recloned = open_source(config, state["source_head"] if state else None)
     if rewritten or recloned:
-        extractcache.wipe(config.cache_dir)
+        extractcache.wipe(config.cache_dir, r2)
+        historyindex.wipe(config.cache_dir, r2)
     open_seconds = time.monotonic() - started
     head = repo.head()
     new_state = {
@@ -493,13 +552,29 @@ def cmd_build(args, *, today, now, oracle, r2, d1) -> int:
         report([("Source head", head[:7]), ("Build", state.get("build", ""))], noop)
         return 0
 
-    data = extract_source(repo, config, today, use_cache=True)
+    budget = args.time_budget if args.time_budget is not None else config.time_budget_minutes
+    workers = args.workers or config.workers or default_workers()
+    data = extract_source(
+        repo, config, today, use_cache=True, workers=workers, r2=r2,
+        deadline=None if budget is None else started + budget * 60,
+    )
     verify_started = time.monotonic()
     samples, mismatches, _seed = run_checks(repo, data, args.sample, args.seed, today, oracle)
     verify_seconds = time.monotonic() - verify_started
     if not mismatches:
-        for act_path, key, cores in data.pending_cache:
-            extractcache.store(config.cache_dir, act_path, key, cores)
+        with ThreadPoolExecutor(max_workers=NEWEST_WORKERS) as pool:
+            list(pool.map(
+                lambda entry: extractcache.store(config.cache_dir, *entry, r2=r2),
+                data.pending_cache,
+            ))
+    if data.missing:
+        if mismatches:
+            print_mismatches(mismatches)
+            print("verification failed: nothing published", file=sys.stderr)
+            return 1
+        total = len(data.metas)
+        print(f"Incomplete: {total - data.missing} of {total} acts extracted; run again to continue")
+        return 0
     build_id = new_state["build"]
     events_started = time.monotonic()
     objects, rows, manifest, counts = build_outputs(repo, data, build_id, now, today)
@@ -597,6 +672,8 @@ def parser() -> argparse.ArgumentParser:
             sub.add_argument("--seed", type=int, default=None)
         if name == "build":
             sub.add_argument("--dry-run", action="store_true")
+            sub.add_argument("--time-budget", type=float, default=None)
+            sub.add_argument("--workers", type=int, default=None)
     return root
 
 

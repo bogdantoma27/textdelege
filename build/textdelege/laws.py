@@ -123,7 +123,9 @@ def changes_feed(articles_by_act: dict[str, list[Article]], limit: int, today: d
     return [_entry(path, article, event) for path, _, article, event in events[:limit]]
 
 
-def upcoming(articles_by_act: dict[str, list[Article]], today: date) -> list[dict]:
+def upcoming(
+    articles_by_act: dict[str, list[Article]], today: date, limit: int | None = None
+) -> list[dict]:
     events = [item for item in _all_events(articles_by_act) if item[3].date > today]
     events.sort(key=lambda item: (item[3].date, item[0], item[1]))
-    return [_entry(path, article, event) for path, _, article, event in events]
+    return [_entry(path, article, event) for path, _, article, event in events[:limit]]

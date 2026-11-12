@@ -16,7 +16,7 @@ jobs:
   build:
     name: Build and publish
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,7 +30,7 @@ jobs:
           restore-keys: |
             build-cache-${{ runner.os }}-
       - name: Run the build
-        run: python -m build.textdelege.cli build
+        run: python -m build.textdelege.cli build --time-budget 300
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}

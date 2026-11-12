@@ -249,14 +249,19 @@ def law_object(law: Law) -> dict:
     }
 
 
-def ruling_object(ruling: Ruling, by_article: dict[tuple[str, str], list[str]]) -> dict:
-    articles = sorted(
-        {
-            (path, stem)
-            for (path, stem), keys in by_article.items()
-            if stem and ruling.key in keys
-        }
-    )
+def articles_by_ruling(
+    by_article: dict[tuple[str, str], list[str]]
+) -> dict[str, list[tuple[str, str]]]:
+    grouped: dict[str, set[tuple[str, str]]] = {}
+    for (path, stem), keys in by_article.items():
+        if stem:
+            for key in keys:
+                grouped.setdefault(key, set()).add((path, stem))
+    return {key: sorted(items) for key, items in grouped.items()}
+
+
+def ruling_object(ruling: Ruling, articles_of: dict[str, list[tuple[str, str]]]) -> dict:
+    articles = articles_of.get(ruling.key, [])
     return {
         "schema": "textdelege/ruling/1",
         "key": ruling.key,
