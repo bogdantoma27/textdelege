@@ -1,7 +1,7 @@
 import { type Child, jsx } from "hono/jsx";
 import { t } from "../text";
 import { Indexed } from "../views/indexed";
-import { articleUrl } from "./urls";
+import { type ArticleRef, articleUrl, isPlainNumber } from "./urls";
 
 const MARKERS = [
   /^\(\d+(?:\^\d+)?\)/,
@@ -45,6 +45,16 @@ export function parseUnit(id: string): UnitRef | null {
   return null;
 }
 
+export function linkableNumbers(articles: readonly ArticleRef[]): ReadonlySet<string> {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const { number } of articles) {
+    if (seen.has(number)) repeated.add(number);
+    seen.add(number);
+  }
+  return new Set([...seen].filter((number) => isPlainNumber(number) && !repeated.has(number)));
+}
+
 export interface CrossReferenceContext {
   actRef: string;
   date: string | null;
@@ -65,7 +75,7 @@ export function linkCrossReferences(body: string, ctx: CrossReferenceContext): C
     const end = match.index + text.length;
     const number = insertion ? `${digits.replaceAll(".", "")}^${insertion}` : digits.replaceAll(".", "");
     if (!ctx.articles.has(number) || OTHER_ACT.test(body.slice(end))) continue;
-    const path = articleUrl(ctx.actRef, number, ctx.date ?? undefined);
+    const path = articleUrl(ctx.actRef, { number, file: "" }, ctx.date ?? undefined);
     const href = alin ? `${path}#alin-${alin.replace("^", "_")}` : path;
     if (match.index > last) out.push(body.slice(last, match.index));
     out.push(jsx("a", { class: "x", href, "data-ref": path }, jsx(Indexed, { text })));

@@ -10,7 +10,8 @@ import type {
   ArticleObject,
   ArticleVersion,
 } from "../lib/types";
-import { unitText } from "../lib/text";
+import { articleLabel } from "../lib/article-label";
+import { linkableNumbers, unitText } from "../lib/text";
 import { type View, resolveView } from "../lib/versions";
 import { SOURCE_REPOSITORY, actUrl, articleUrl, compareUrl, sourceFileUrl } from "../lib/urls";
 import { Rail, Contents, FreshnessWarning, citationOf, type RailProps } from "./article-rails";
@@ -57,7 +58,7 @@ function lastDay(article: ArticleObject, version: ArticleVersion, index: number)
 
 function neighbour(
   n: ArticleNeighbour | null,
-  href: (number: string) => string,
+  href: (target: ArticleNeighbour) => string,
 ): { href: string; title: string } | undefined {
   if (n === null) return undefined;
   const state =
@@ -67,7 +68,7 @@ function neighbour(
         ? ` (${t("stateFutureShort")})`
         : "";
   const title = n.title ? ` ${n.title}` : "";
-  return { href: href(n.number), title: `${t("articleAbbr", { number: n.number })}${title}${state}` };
+  return { href: href(n), title: `${articleLabel(n)}${title}${state}` };
 }
 
 export function singleLaw(version: ArticleVersion): boolean {
@@ -204,14 +205,14 @@ export function renderArticle(
 
   const actRef = act.alias ?? act.path;
   const dateArg = date ?? undefined;
-  const path = articleUrl(actRef, article.number, dateArg);
+  const path = articleUrl(actRef, article, dateArg);
   const flags: Record<string, string> = {};
   if (!ctx.attribution) flags.atribuire = "0";
   if (ctx.highlightLast) flags.ultima = "1";
   const query = new URLSearchParams(flags).toString();
   const keep = query === "" ? "" : `?${query}`;
-  const onDate = (on: string) => articleUrl(actRef, article.number, on) + keep;
-  const current = articleUrl(actRef, article.number) + keep;
+  const onDate = (on: string) => articleUrl(actRef, article, on) + keep;
+  const current = articleUrl(actRef, article) + keep;
 
   const first = article.versions[0]!;
   const last = article.versions[article.versions.length - 1]!;
@@ -233,12 +234,12 @@ export function renderArticle(
 
   const previous = view.kind === "beforeFirst" ? undefined : article.versions[index - 1];
   const compare = previous
-    ? compareUrl(actRef, article.number, previous.from, version.from)
-    : compareUrl(actRef, article.number, first.from, last.from);
+    ? compareUrl(actRef, article, previous.from, version.from)
+    : compareUrl(actRef, article, first.from, last.from);
   const inForce = last.until === null || last.until >= ctx.now;
   const toCurrent =
     showsText && inForce && index < article.versions.length - 1
-      ? compareUrl(actRef, article.number, version.from, last.from)
+      ? compareUrl(actRef, article, version.from, last.from)
       : undefined;
 
   const options: Option[] = [
@@ -250,7 +251,7 @@ export function renderArticle(
       : []),
   ];
 
-  const heading = t("articleAbbr", { number: article.number });
+  const heading = articleLabel(article, act.articles);
   const title = `${heading} ${name}`;
   const description = article.title ? `${title}: ${article.title}` : title;
   const canonical = `${ORIGIN}${path}`;
@@ -261,7 +262,7 @@ export function renderArticle(
       description={description}
       canonical={canonical}
       script="/article.js"
-      toc={<Contents {...rail} path={path} current={article.file} prev={article.prev?.number ?? null} next={article.next?.number ?? null} />}
+      toc={<Contents {...rail} path={path} current={article.file} prev={article.prev} next={article.next} />}
       rail={<Rail {...rail} />}
       cite={{ sentence: cite.sentence, address: cite.permanent }}
     >
@@ -327,16 +328,16 @@ export function renderArticle(
               index={index}
               now={ctx.now}
               attribution={attributed}
-              changeHref={previous ? compareUrl(actRef, article.number, previous.from, version.from) : undefined}
+              changeHref={previous ? compareUrl(actRef, article, previous.from, version.from) : undefined}
             />
-            <SourceLine act={act} article={article} version={version} address={`${ORIGIN}${articleUrl(actRef, article.number, version.from)}`} />
+            <SourceLine act={act} article={article} version={version} address={`${ORIGIN}${articleUrl(actRef, article, version.from)}`} />
           </>
         )}
 
         <History
           article={article}
           shown={showsText ? version.from : undefined}
-          href={(from, to) => (to === undefined ? onDate(from) : compareUrl(actRef, article.number, from, to))}
+          href={(from, to) => (to === undefined ? onDate(from) : compareUrl(actRef, article, from, to))}
         />
         <Pagination
           prev={neighbour(article.prev, (n) => articleUrl(actRef, n, dateArg) + keep)}
@@ -446,12 +447,12 @@ function LawText(props: {
   const { act, article, actRef, date, version, index } = props;
   const labels = lawLabels(act, article);
   const colours = barColours(article);
-  const numbers = new Set(act.articles.map((entry) => entry.number));
+  const numbers = linkableNumbers(act.articles);
   const linked = (body: string) => linkCrossReferences(body, { actRef, date, articles: numbers });
-  const permanent = `${ORIGIN}${articleUrl(actRef, article.number, version.from)}`;
+  const permanent = `${ORIGIN}${articleUrl(actRef, article, version.from)}`;
   const copyText = (line: ArticleLine) =>
     `${t("citeParagraph", {
-      ref: `${t("articleAbbr", { number: article.number })} ${unitText(line.id)}`,
+      ref: `${articleLabel(article, act.articles)} ${unitText(line.id)}`,
       act: act.short ?? act.title,
       date: formatRo(date ?? props.now),
     })}, ${permanent}#${line.id}`;
@@ -488,10 +489,10 @@ function SourceLine(props: {
   }
   const blob = sourceFileUrl(act, article, version);
   const issue = new URLSearchParams({
-    title: t("reportTitle", { act: act.short ?? act.title, article: t("articleAbbr", { number: article.number }) }),
+    title: t("reportTitle", { act: act.short ?? act.title, article: articleLabel(article, act.articles) }),
     body: t("reportBody", {
       act: act.short ?? act.title,
-      article: t("articleAbbr", { number: article.number }),
+      article: articleLabel(article, act.articles),
       date: formatRo(version.from),
       commit: version.commit,
       address: props.address,

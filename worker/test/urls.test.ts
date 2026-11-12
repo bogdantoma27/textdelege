@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   actUrl,
+  actPathParts,
   articleSlug,
+  articleSlugFor,
+  findArticle,
+  isArticleSlug,
   articleUrl,
   changesUrl,
   compareUrl,
   lawUrlFromKey,
-  numberFromSlug,
   parsePath,
   rulingKeyFromRoute,
   rulingUrlFromKey,
@@ -21,27 +24,87 @@ describe("article slugs", () => {
     ["2029^10", "art-2029-10"],
   ])("round trips %s", (number, slug) => {
     expect(articleSlug(number)).toBe(slug);
-    expect(numberFromSlug(slug)).toBe(number);
+    expect(articleSlugFor({ number, file: "art-zzz" })).toBe(slug);
+    expect(isArticleSlug(slug)).toBe(true);
   });
 
-  it.each(["art-", "art", "1112", "art-x", "art-01x", "arts-1", "art--1", "art-1-", "art-01", "art-0", "art-112-01"])(
-    "rejects %s",
-    (slug) => {
-      expect(numberFromSlug(slug)).toBeNull();
-    },
-  );
+  it.each([
+    ["270^2 a)", "art-270-2-a"],
+    ["I", "art-i"],
+    ["III^1", "art-iii-1"],
+    ["I", "art-t2-i"],
+    ["I", "art-t3-i"],
+    ["UNIC", "art-t1-unic"],
+    ["0", "art-000"],
+  ])("uses the file stem for number %s", (number, file) => {
+    expect(articleSlugFor({ number, file })).toBe(file);
+    expect(isArticleSlug(file)).toBe(true);
+  });
+
+  it.each(["art-", "art", "1112", "art-X", "arts-1x", "art--1", "art-1-", "art-a_b", "art-1/2"])("rejects %s", (slug) => {
+    expect(isArticleSlug(slug)).toBe(false);
+  });
+
+  it("finds an article by slug even when numbers repeat", () => {
+    const articles = [
+      { number: "5", file: "art-005" },
+      { number: "I", file: "art-t2-i" },
+      { number: "I", file: "art-t3-i" },
+    ];
+    expect(findArticle(articles, "art-5")).toBe(articles[0]);
+    expect(findArticle(articles, "art-t3-i")).toBe(articles[2]);
+    expect(findArticle(articles, "art-t2-i")).toBe(articles[1]);
+    expect(findArticle(articles, "art-005")).toBeUndefined();
+    expect(findArticle(articles, "art-i")).toBeUndefined();
+  });
 });
 
+describe("act path parts", () => {
+  it.each([
+    ["lege/2009/287", { kind: "lege", chamber: null, year: "2009", number: "287" }],
+    ["hotarare-parlament/camera/1990/14", { kind: "hotarare-parlament", chamber: "camera", year: "1990", number: "14" }],
+    ["hotarare-parlament/senat/2005/3", { kind: "hotarare-parlament", chamber: "senat", year: "2005", number: "3" }],
+    ["constitutie/1991", { kind: "constitutie", chamber: null, year: "1991", number: "" }],
+  ])("splits %s", (path, expected) => {
+    expect(actPathParts(path)).toEqual(expected);
+  });
+});
+
+const art = (number: string, file = `art-${number.padStart(3, "0")}`) => ({ number, file });
+
 describe("url builders", () => {
+  it("builds urls for non-numeric articles from the file stem", () => {
+    const unic = art("UNIC", "art-t1-unic");
+    const second = art("I", "art-t2-i");
+    expect(articleUrl("lege/2007/363", unic)).toBe("/lege/2007/363/art-t1-unic");
+    expect(articleUrl("lege/2007/363", second, "2008-01-01")).toBe("/lege/2007/363/art-t2-i/2008-01-01");
+    expect(compareUrl("lege/2007/363", art("270^2 a)", "art-270-2-a"), "2020-01-01", "2021-01-01")).toBe(
+      "/lege/2007/363/art-270-2-a/compara/2020-01-01..2021-01-01",
+    );
+    expect(changesUrl("lege/2007/363", art("III^1", "art-iii-1"))).toBe("/modificari/lege/2007/363/art-iii-1");
+    expect(subscribeUrl("lege/2007/363", second)).toBe("/abonare/lege/2007/363/art-t2-i");
+  });
+
+  it("keeps numeric slugs for numeric articles whatever the file", () => {
+    expect(articleUrl("codul-civil", art("6^1", "art-006-1"))).toBe("/codul-civil/art-6-1");
+  });
+
+  it("builds Parliament decision urls", () => {
+    expect(actUrl("hotarare-parlament/camera/1990/14")).toBe("/hotarare-parlament/camera/1990/14");
+    expect(articleUrl("hotarare-parlament/senat/2005/3", art("I", "art-i"))).toBe(
+      "/hotarare-parlament/senat/2005/3/art-i",
+    );
+  });
+
   it("builds article, act, compare, ruling, law and changes urls", () => {
-    expect(articleUrl("codul-civil", "1")).toBe("/codul-civil/art-1");
-    expect(articleUrl("codul-penal", "112^1")).toBe("/codul-penal/art-112-1");
-    expect(articleUrl("lege/2009/287", "1112", "2014-10-18")).toBe(
+    expect(articleUrl("codul-civil", art("1"))).toBe("/codul-civil/art-1");
+    expect(articleUrl("codul-penal", art("112^1"))).toBe("/codul-penal/art-112-1");
+    expect(articleUrl("lege/2009/287", art("1112"), "2014-10-18")).toBe(
       "/lege/2009/287/art-1112/2014-10-18",
     );
     expect(actUrl("codul-civil")).toBe("/codul-civil");
     expect(actUrl("codul-civil", "2014-10-18")).toBe("/codul-civil/2014-10-18");
-    expect(compareUrl("codul-civil", "1112", "2014-10-19", "2021-03-13")).toBe(
+    expect(compareUrl("codul-civil", art("1112"), "2014-10-19", "2021-03-13")).toBe(
       "/codul-civil/art-1112/compara/2014-10-19..2021-03-13",
     );
     expect(compareUrl("codul-civil", null, "2014-10-19", "2021-03-13")).toBe(
@@ -49,9 +112,9 @@ describe("url builders", () => {
     );
     expect(changesUrl()).toBe("/modificari");
     expect(changesUrl("codul-civil")).toBe("/modificari/codul-civil");
-    expect(changesUrl("codul-civil", "1112")).toBe("/modificari/codul-civil/art-1112");
+    expect(changesUrl("codul-civil", art("1112"))).toBe("/modificari/codul-civil/art-1112");
     expect(subscribeUrl()).toBe("/abonare");
-    expect(subscribeUrl("lege/2009/287", "1112")).toBe("/abonare/lege/2009/287/art-1112");
+    expect(subscribeUrl("lege/2009/287", art("1112"))).toBe("/abonare/lege/2009/287/art-1112");
   });
 });
 
@@ -62,16 +125,16 @@ describe("parsePath", () => {
     date,
     tab,
   });
-  const article = (actRef: string, number: string, date: string | null = null) => ({
+  const article = (actRef: string, slug: string, date: string | null = null) => ({
     kind: "article",
     actRef,
-    number,
+    slug,
     date,
   });
-  const changes = (actRef: string | null, number: string | null, format: string) => ({
+  const changes = (actRef: string | null, slug: string | null, format: string) => ({
     kind: "changes",
     actRef,
-    number,
+    slug,
     format,
   });
 
@@ -87,7 +150,24 @@ describe("parsePath", () => {
     ["/decret-lege/1989/2", act("decret-lege/1989/2")],
     ["/decret-lege/1938/115", act("decret-lege/1938/115")],
     ["/decret/1990/1", act("decret/1990/1")],
-    ["/hotarare-parlament/2000/1", act("hotarare-parlament/2000/1")],
+    ["/hotarare-parlament/camera/1990/14", act("hotarare-parlament/camera/1990/14")],
+    ["/hotarare-parlament/senat/2005/3", act("hotarare-parlament/senat/2005/3")],
+    ["/hotarare-parlament/senat/2005/3/2006-01-01", act("hotarare-parlament/senat/2005/3", "2006-01-01")],
+    ["/hotarare-parlament/senat/2005/3/art-2", article("hotarare-parlament/senat/2005/3", "art-2")],
+    ["/hotarare-parlament/senat/2005/3/art-i", article("hotarare-parlament/senat/2005/3", "art-i")],
+    ["/hotarare-parlament/camera/1990/14/istoric", act("hotarare-parlament/camera/1990/14", null, "istoric")],
+    ["/modificari/hotarare-parlament/camera/1990/14", changes("hotarare-parlament/camera/1990/14", null, "html")],
+    ["/hotarare-parlament/2000/1", null],
+    ["/hotarare-parlament/camera/1990", null],
+    ["/hotarare-parlament/consiliu/1990/14", null],
+    ["/lege/2007/363/art-t2-i", article("lege/2007/363", "art-t2-i")],
+    ["/lege/2007/363/art-t1-unic", article("lege/2007/363", "art-t1-unic")],
+    [
+      "/lege/2007/363/art-270-2-a/compara/2020-01-01..2021-01-01",
+      { kind: "compareArticle", actRef: "lege/2007/363", slug: "art-270-2-a", from: "2020-01-01", to: "2021-01-01" },
+    ],
+    ["/modificari/lege/2007/363/art-t3-i.atom", changes("lege/2007/363", "art-t3-i", "atom")],
+    ["/abonare/lege/2007/363/art-iii-1", changes("lege/2007/363", "art-iii-1", "subscribe")],
     ["/constitutie/1991", act("constitutie/1991")],
     ["/cod/1864/civil", act("cod/1864/civil")],
     ["/codul-civil/2014-10-19", act("codul-civil", "2014-10-19")],
@@ -98,18 +178,18 @@ describe("parsePath", () => {
     ["/codul-civil/jurisprudenta", act("codul-civil", null, "jurisprudenta")],
     ["/codul-civil/statistici", act("codul-civil", null, "statistici")],
     ["/lege/2009/287/date", act("lege/2009/287", null, "date")],
-    ["/codul-civil/art-1", article("codul-civil", "1")],
-    ["/codul-penal/art-112-1", article("codul-penal", "112^1")],
-    ["/lege/2009/287/art-1112", article("lege/2009/287", "1112")],
-    ["/lege/2009/287/art-1112/2014-10-18", article("lege/2009/287", "1112", "2014-10-18")],
-    ["/codul-civil/art-1112/2014-10-18/", article("codul-civil", "1112", "2014-10-18")],
-    ["/codul-civil/art-%31", article("codul-civil", "1")],
+    ["/codul-civil/art-1", article("codul-civil", "art-1")],
+    ["/codul-penal/art-112-1", article("codul-penal", "art-112-1")],
+    ["/lege/2009/287/art-1112", article("lege/2009/287", "art-1112")],
+    ["/lege/2009/287/art-1112/2014-10-18", article("lege/2009/287", "art-1112", "2014-10-18")],
+    ["/codul-civil/art-1112/2014-10-18/", article("codul-civil", "art-1112", "2014-10-18")],
+    ["/codul-civil/art-%31", article("codul-civil", "art-1")],
     [
       "/codul-civil/art-1112/compara/2014-10-19..2021-03-13",
       {
         kind: "compareArticle",
         actRef: "codul-civil",
-        number: "1112",
+        slug: "art-1112",
         from: "2014-10-19",
         to: "2021-03-13",
       },
@@ -125,11 +205,11 @@ describe("parsePath", () => {
     ["/modificari.atom", changes(null, null, "atom")],
     ["/modificari/codul-civil", changes("codul-civil", null, "html")],
     ["/modificari/codul-civil.atom", changes("codul-civil", null, "atom")],
-    ["/modificari/codul-civil/art-1112", changes("codul-civil", "1112", "html")],
-    ["/modificari/codul-civil/art-1112.atom", changes("codul-civil", "1112", "atom")],
+    ["/modificari/codul-civil/art-1112", changes("codul-civil", "art-1112", "html")],
+    ["/modificari/codul-civil/art-1112.atom", changes("codul-civil", "art-1112", "atom")],
     ["/abonare", changes(null, null, "subscribe")],
     ["/abonare/codul-civil", changes("codul-civil", null, "subscribe")],
-    ["/abonare/codul-civil/art-112-1", changes("codul-civil", "112^1", "subscribe")],
+    ["/abonare/codul-civil/art-112-1", changes("codul-civil", "art-112-1", "subscribe")],
     ["/legislatie/2019-01-01", { kind: "pointInTime", date: "2019-01-01" }],
     ["/despre", { kind: "help", page: "despre" }],
     ["/legenda", { kind: "help", page: "legenda" }],
@@ -186,11 +266,11 @@ describe("parsePath", () => {
   });
 
   it("round trips the builders", () => {
-    expect(parsePath(articleUrl("codul-penal", "112^1", "2020-01-01"))).toEqual(
-      article("codul-penal", "112^1", "2020-01-01"),
+    expect(parsePath(articleUrl("codul-penal", art("112^1"), "2020-01-01"))).toEqual(
+      article("codul-penal", "art-112-1", "2020-01-01"),
     );
-    expect(parsePath(changesUrl("lege/2009/287", "2029^10"))).toEqual(
-      changes("lege/2009/287", "2029^10", "html"),
+    expect(parsePath(changesUrl("lege/2009/287", art("2029^10")))).toEqual(
+      changes("lege/2009/287", "art-2029-10", "html"),
     );
   });
 });

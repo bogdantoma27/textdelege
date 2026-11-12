@@ -1,3 +1,4 @@
+import { articleLabel } from "../lib/article-label";
 import type { Child } from "hono/jsx";
 import { type Key, type PluralForm, t, tPlural } from "../text";
 import { ACT_CAP, eventsIn, linkRange } from "../lib/compare";
@@ -412,8 +413,8 @@ function SameLaw(props: {
               return (
                 <tr>
                   <td>
-                    <a href={articleUrl(actRef, change.number, change.date)}>
-                      <Indexed text={t("articleAbbr", { number: change.number })} />
+                    <a href={articleUrl(actRef, change, change.date)}>
+                      <Indexed text={articleLabel(change, act.articles)} />
                     </a>
                     {title && ` ${title}`}
                   </td>
@@ -423,11 +424,11 @@ function SameLaw(props: {
                   </td>
                   <td>
                     {comparable ? (
-                      <a href={compareUrl(actRef, change.number, dayBefore(change.date), change.date)}>
+                      <a href={compareUrl(actRef, change, dayBefore(change.date), change.date)}>
                         {t("cmpCompare")}
                       </a>
                     ) : (
-                      <a href={articleUrl(actRef, change.number, change.date)}>{t("cmpOpen")}</a>
+                      <a href={articleUrl(actRef, change, change.date)}>{t("cmpOpen")}</a>
                     )}
                   </td>
                 </tr>
@@ -477,7 +478,7 @@ function Pick(props: {
       </option>
     ));
   return (
-    <form class="pick" data-filter="" method="get" action={`${articleUrl(props.actRef, article.number)}/compara`}>
+    <form class="pick" data-filter="" method="get" action={`${articleUrl(props.actRef, article)}/compara`}>
       <fieldset>
         <legend>{t("cmpPickTitle")}</legend>
         <div class="pick-fields">
@@ -525,8 +526,8 @@ export function renderCompare(
 
   const actRef = act.alias ?? act.path;
   const name = act.short ?? act.title;
-  const heading = t("articleAbbr", { number: article.number });
-  const path = compareUrl(actRef, article.number, from, to);
+  const heading = articleLabel(article, act.articles);
+  const path = compareUrl(actRef, article, from, to);
   const here = (over: Record<string, string>) => withQuery(path, over);
   const keep = flagParams(ctx);
   const title = `${heading} ${name}: ${t("cmpKicker")} ${dayRange(from, to)}`;
@@ -566,7 +567,7 @@ export function renderCompare(
       canonical={permanent}
       noindex
       script="/article.js"
-      toc={<Contents {...rail} path={articleUrl(actRef, article.number)} current={article.file} />}
+      toc={<Contents {...rail} path={articleUrl(actRef, article)} current={article.file} />}
       rail={
         <aside class="rail">
           <CitationPanel
@@ -588,7 +589,7 @@ export function renderCompare(
           items={[
             { href: "/", label: t("breadcrumbHome") },
             { href: actUrl(actRef), label: name },
-            { href: articleUrl(actRef, article.number), label: <Indexed text={heading} /> },
+            { href: articleUrl(actRef, article), label: <Indexed text={heading} /> },
           ]}
         />
         <p class="caption">
@@ -625,7 +626,7 @@ export function renderCompare(
             to={newer.from}
             points={article.versions.map((version) => ({
               date: version.from,
-              href: articleUrl(actRef, article.number, version.from),
+              href: articleUrl(actRef, article, version.from),
               name: version.law?.label ?? "",
             }))}
           />
@@ -704,13 +705,13 @@ export function renderCompare(
           <Pagination
             captions={{ prev: t("cmpPrevVersion"), next: t("next") }}
             prev={{
-              href: withQuery(compareUrl(actRef, article.number, previous.from, older.from), keep),
+              href: withQuery(compareUrl(actRef, article, previous.from, older.from), keep),
               title: dayRange(previous.from, older.from),
             }}
           />
         )}
         <p class="back">
-          <a href={articleUrl(actRef, article.number)}>
+          <a href={articleUrl(actRef, article)}>
             <ChevronLeftIcon size={16} />
             <Indexed text={t("cmpBackLink", { number: article.number })} />
           </a>
@@ -815,15 +816,15 @@ function ActRow(props: { actRef: string; row: ActCompareRow; from: string; to: s
   const { actRef, row } = props;
   const range = linkRange(row.article, props.from, props.to);
   const link: Child = range ? (
-    <a href={compareUrl(actRef, row.article.number, range.from, range.to)}>{t("cmpCompare")}</a>
+    <a href={compareUrl(actRef, row.article, range.from, range.to)}>{t("cmpCompare")}</a>
   ) : (
-    <a href={articleUrl(actRef, row.article.number)}>{t("cmpOpen")}</a>
+    <a href={articleUrl(actRef, row.article)}>{t("cmpOpen")}</a>
   );
   return (
     <tr>
       <td>
-        <a href={articleUrl(actRef, row.article.number)}>
-          <Indexed text={t("articleAbbr", { number: row.article.number })} />
+        <a href={articleUrl(actRef, row.article)}>
+          <Indexed text={articleLabel(row.article)} />
         </a>
         {row.article.title && ` ${row.article.title}`}
       </td>

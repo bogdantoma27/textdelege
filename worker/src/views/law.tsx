@@ -1,3 +1,4 @@
+import { articleLabel } from "../lib/article-label";
 import type { Child } from "hono/jsx";
 import { type Key, type PluralForm, t, tPlural } from "../text";
 import { dayBefore, formatRo } from "../lib/dates";
@@ -98,8 +99,8 @@ function Row(ref: string, change: LawChange): Child[] {
   const units = change.units.map((id) => unitText(id)).join(", ");
   const compare = change.verb === "modified" || change.verb === "completed";
   return [
-    <a href={articleUrl(ref, change.number, change.date)}>
-      <Indexed text={t("articleAbbr", { number: change.number })} />
+    <a href={articleUrl(ref, change, change.date)}>
+      <Indexed text={articleLabel(change)} />
     </a>,
     <>
       <span class="verb">{t(VERBS[change.verb])}</span>
@@ -107,9 +108,9 @@ function Row(ref: string, change: LawChange): Child[] {
     </>,
     formatRo(change.date),
     compare ? (
-      <a href={compareUrl(ref, change.number, dayBefore(change.date), change.date)}>{t("cmpCompare")}</a>
+      <a href={compareUrl(ref, change, dayBefore(change.date), change.date)}>{t("cmpCompare")}</a>
     ) : (
-      <a href={articleUrl(ref, change.number, change.date)}>{t("lawViewText")}</a>
+      <a href={articleUrl(ref, change, change.date)}>{t("lawViewText")}</a>
     ),
   ];
 }

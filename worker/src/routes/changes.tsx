@@ -7,7 +7,7 @@ import { findCitedAct, resolveAct } from "../lib/resolve";
 import type { AppEnv, Store } from "../lib/store";
 import { unitText } from "../lib/text";
 import type { ActIndexEntry, ChangeItem, ChangesObject } from "../lib/types";
-import { articleUrl, changesUrl, parsePath } from "../lib/urls";
+import { articleUrl, changesUrl, findArticle, parsePath } from "../lib/urls";
 import { type ActNames, type ChangesPage, actChoices, actNames, renderChanges } from "../views/changes";
 import { ORIGIN } from "../views/layout";
 import { renderSubscribe } from "../views/subscribe";
@@ -34,7 +34,7 @@ function entryOf(item: ChangeItem, origin: string, names: ActNames): FeedEntry {
     ),
     title: t("feedEntryTitle", { act: act.name, number: item.number, verb }),
     updated: `${item.date}T00:00:00Z`,
-    link: `${origin}${articleUrl(act.ref, item.number, item.date)}`,
+    link: `${origin}${articleUrl(act.ref, item, item.date)}`,
     summary: item.law
       ? t("feedSummaryLaw", { change, law: lawLabelText(item.law.key, item.law.label), date })
       : t("feedSummary", { change, date }),
@@ -62,7 +62,7 @@ function splitOn(now: string, changes: ChangesObject | null) {
 async function scopeOf(
   store: Store,
   index: ActIndexEntry[],
-  route: { actRef: string | null; number: string | null },
+  route: { actRef: string | null; slug: string | null },
 ): Promise<Scope | null> {
   const names = actNames(index);
   const now = today();
@@ -84,7 +84,7 @@ async function scopeOf(
   const name = act.short ?? act.title;
   if (!names.has(act.path)) names.set(act.path, { ref, name });
 
-  if (route.number === null) {
+  if (route.slug === null) {
     const changes = await store.changes(act.path);
     return {
       path: changesUrl(ref),
@@ -96,7 +96,7 @@ async function scopeOf(
     };
   }
 
-  const entry = act.articles.find((candidate) => candidate.number === route.number);
+  const entry = findArticle(act.articles, route.slug);
   const article = entry === undefined ? null : await store.article(act.path, entry.file);
   if (!article) return null;
   const events: ChangeItem[] = article.events.map((event) => ({
@@ -111,7 +111,7 @@ async function scopeOf(
   }));
   const vars = { act: name, number: article.number };
   return {
-    path: changesUrl(ref, article.number),
+    path: changesUrl(ref, article),
     heading: t("changesArticleHeading", vars),
     subject: t("subscribeSubjectArticle", vars),
     feedTitle: t("feedArticleTitle", vars),
@@ -176,7 +176,7 @@ changesRoutes.get("*", async (c, next) => {
       names: scope.names,
       filters,
       choices: route.actRef === null ? actChoices(manifest.acts) : null,
-      window: route.actRef === null ? "site" : route.number === null ? "act" : null,
+      window: route.actRef === null ? "site" : route.slug === null ? "act" : null,
       invalid,
       alt,
       altInvalid,

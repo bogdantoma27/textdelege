@@ -57,7 +57,7 @@ function urlEntry(path: string, lastmod: string | null): string {
 }
 
 function entryPath(entry: SitemapEntry): string {
-  return entry.number === null ? actUrl(entry.actRef) : articleUrl(entry.actRef, entry.number);
+  return entry.number === null || entry.file === null ? actUrl(entry.actRef) : articleUrl(entry.actRef, { number: entry.number, file: entry.file });
 }
 
 export const siteRoutes = new Hono<AppEnv>();

@@ -2,15 +2,21 @@ import { Hono } from "hono";
 import { type Citation, citationUrl, parseCitation } from "../lib/citation";
 import { COUNT_CAP, type AppEnv, type Store } from "../lib/store";
 import type { ActIndexEntry } from "../lib/types";
+import { citedAct } from "../lib/resolve";
 import { lawKeyFromActRef, lawUrlFromKey } from "../lib/urls";
 import { actNames } from "../views/changes";
 import { pageNumber } from "../lib/act";
 import { HITS_LIMIT, MAX_QUERY, renderSearch } from "../views/search";
 
-function isSelected(index: ActIndexEntry[], citation: Citation): boolean {
-  const { alias, kind, number, year } = citation.act;
-  if (alias !== undefined) return index.some((act) => act.alias === alias);
-  return index.some((act) => act.path === `${kind}/${year}/${number}`);
+function selectedUrl(index: ActIndexEntry[], citation: Citation): string | null {
+  const found = citedAct(index, citation);
+  if (found === null) return null;
+  const chamber = found.path.split("/")[1];
+  const resolved =
+    citation.act.kind === "hotarare-parlament" && citation.act.chamber === undefined
+      ? { ...citation, act: { ...citation.act, chamber } }
+      : citation;
+  return citationUrl(resolved);
 }
 
 async function amendingActUrl(store: Store, citation: Citation): Promise<string | null> {
@@ -35,10 +41,8 @@ searchRoutes.get("/cauta", async (c) => {
   if (query === "") return c.html(renderSearch({ query, inForce, hits: null, total: 0, over: false, live: false, page: 1, pages: 1, names }));
 
   const citation = parseCitation(query);
-  const target = citation === null ? null : citationUrl(citation);
-  if (citation !== null && target !== null && isSelected(index, citation)) {
-    return c.redirect(target, 302);
-  }
+  const target = citation === null ? null : selectedUrl(index, citation);
+  if (target !== null) return c.redirect(target, 302);
   const law = citation === null ? null : await amendingActUrl(store, citation);
   if (law !== null) return c.redirect(law, 302);
 

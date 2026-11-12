@@ -4,7 +4,7 @@ import { pageNumber } from "../lib/act";
 import { parseDate, today } from "../lib/dates";
 import type { AppEnv } from "../lib/store";
 import type { ActIndexEntry } from "../lib/types";
-import { parsePath } from "../lib/urls";
+import { actPathParts, parsePath } from "../lib/urls";
 import { type PitAct, type PitOthers, PAGE_SIZE, renderPointInTime } from "../views/point-in-time";
 
 const KIND_ORDER = ["lege", "oug", "og", "hg", "decret-lege", "decret", "hotarare-parlament"];
@@ -15,8 +15,8 @@ const kindRank = (kind: string) => {
 };
 
 function byNewest(a: ActIndexEntry, b: ActIndexEntry): number {
-  const [, yearA = "", numberA = ""] = a.path.split("/");
-  const [, yearB = "", numberB = ""] = b.path.split("/");
+  const { year: yearA, number: numberA } = actPathParts(a.path);
+  const { year: yearB, number: numberB } = actPathParts(b.path);
   return (
     Number(yearB) - Number(yearA) || Number(numberB) - Number(numberA) || a.path.localeCompare(b.path)
   );

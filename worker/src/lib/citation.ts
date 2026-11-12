@@ -1,7 +1,7 @@
 import { articleSlug } from "./urls";
 
 export interface Citation {
-  act: { alias?: string; kind?: string; number?: string; year?: string };
+  act: { alias?: string; kind?: string; chamber?: string; number?: string; year?: string };
   article?: string;
   alin?: string;
   lit?: string;
@@ -48,7 +48,9 @@ const CODE_REGEXES = CODE_PATTERNS.map(
   ([alias, source]) => [alias, new RegExp(`(?<![a-z0-9])(?:${source})(?![a-z0-9])`)] as const,
 );
 
-const NUMBERED_PATTERNS: [string, string][] = [
+const NUMBERED_PATTERNS: [string, string, string?][] = [
+  ["hotarare-parlament", "hotararea camerei deputatilor|hotararii camerei deputatilor|h\.? ?c\.? ?d\.?", "camera"],
+  ["hotarare-parlament", "hotararea senatului|hotararii senatului|h\.? ?s\.?", "senat"],
   ["decret-lege", "decretul[- ]lege|decretului[- ]lege|decret[- ]lege|d\\.? ?-? ?l\\.?"],
   ["hotarare-parlament", "hotararea parlamentului|hotararii parlamentului|h\\.? ?p\\.?"],
   ["lege", "legea|legii|lege"],
@@ -59,9 +61,10 @@ const NUMBERED_PATTERNS: [string, string][] = [
 ];
 
 const NUMBERED_REGEXES = NUMBERED_PATTERNS.map(
-  ([kind, source]) =>
+  ([kind, source, chamber]) =>
     [
       kind,
+      chamber,
       new RegExp(
         `(?<![a-z0-9])(?:${source}) ?(?:nr\\.? ?)?(\\d+) ?(?:/| din )(\\d{4})(?![0-9])`,
       ),
@@ -83,9 +86,9 @@ const SHORT_CODES: [string, RegExp][] = [
 const MAX_LENGTH = 200;
 
 function findAct(text: string, original: string): Citation["act"] | null {
-  for (const [kind, regex] of NUMBERED_REGEXES) {
+  for (const [kind, chamber, regex] of NUMBERED_REGEXES) {
     const match = regex.exec(text);
-    if (match) return { kind, number: match[1], year: match[2] };
+    if (match) return { kind, ...(chamber === undefined ? {} : { chamber }), number: match[1], year: match[2] };
   }
   for (const [alias, regex] of CODE_REGEXES) {
     if (regex.test(text)) return { alias };
@@ -121,7 +124,9 @@ export function citationUrl(c: Citation): string | null {
   if (c.act.alias) {
     base = `/${c.act.alias}`;
   } else if (c.act.kind && c.act.number && c.act.year) {
-    base = `/${c.act.kind}/${c.act.year}/${c.act.number}`;
+    const chamber = c.act.kind === "hotarare-parlament" ? c.act.chamber : undefined;
+    if (c.act.kind === "hotarare-parlament" && chamber === undefined) return null;
+    base = `/${c.act.kind}/${chamber === undefined ? "" : `${chamber}/`}${c.act.year}/${c.act.number}`;
   } else {
     return null;
   }

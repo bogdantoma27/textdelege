@@ -1,10 +1,11 @@
 import type { Child } from "hono/jsx";
 import { genitive, t } from "../text";
 import { tocEntries } from "../lib/act";
+import { articleLabel } from "../lib/article-label";
 import { normalise } from "../lib/citation";
 import { formatRo } from "../lib/dates";
 import type { ActArticleEntry, ActObject, ArticleObject, ArticleState, ArticleVersion } from "../lib/types";
-import { actUrl, articleUrl, rulingUrlFromKey, subscribeUrl } from "../lib/urls";
+import { type ArticleRef, actUrl, articleUrl, rulingUrlFromKey, subscribeUrl } from "../lib/urls";
 import { Indexed } from "./indexed";
 import { ORIGIN } from "./layout";
 import { Panel, Support, WarningText } from "./components";
@@ -72,8 +73,8 @@ export interface ContentsProps {
   current: string | null;
   around?: string;
   cap?: number;
-  prev?: string | null;
-  next?: string | null;
+  prev?: ArticleRef | null;
+  next?: ArticleRef | null;
   all?: boolean;
 }
 
@@ -88,7 +89,7 @@ export function Contents(props: ContentsProps) {
   const filtering = query !== "";
   const all = tocEntries(act, date, props.now);
   const position = all.findIndex((item) => item.entry.file === props.current);
-  const articleHref = (number: string) => articleUrl(actRef, number, date ?? undefined) + keep;
+  const articleHref = (target: ArticleRef) => articleUrl(actRef, target, date ?? undefined) + keep;
   let shown = all;
   let note: string | null = null;
   let before: { n: number; href: string } | null = null;
@@ -104,9 +105,9 @@ export function Contents(props: ContentsProps) {
     const at = Math.max(0, shown.findIndex((item) => item.entry.file === centre));
     const start = Math.max(0, at - WINDOW);
     const end = Math.min(shown.length, start + 2 * WINDOW + 1);
-    if (start > 0) before = { n: start, href: articleHref(shown[Math.max(0, start - WINDOW)]!.entry.number) };
+    if (start > 0) before = { n: start, href: articleHref(shown[Math.max(0, start - WINDOW)]!.entry) };
     if (end < shown.length) {
-      after = { n: shown.length - end, href: articleHref(shown[Math.min(shown.length - 1, end - 1 + WINDOW)]!.entry.number) };
+      after = { n: shown.length - end, href: articleHref(shown[Math.min(shown.length - 1, end - 1 + WINDOW)]!.entry) };
     }
     shown = shown.slice(start, end);
   }
@@ -167,7 +168,7 @@ export function Contents(props: ContentsProps) {
             const text = entry.title ?? excerpt ?? label;
             return (
               <a
-                href={articleHref(entry.number)}
+                href={articleHref(entry)}
                 class={current ? "cur" : state === "repealed" ? "rep" : state === "future" ? "fut" : undefined}
                 aria-current={current ? "page" : undefined}
                 title={entryTip(entry, state, act)}
@@ -196,7 +197,7 @@ export function Contents(props: ContentsProps) {
           <a class="side" href={articleHref(props.prev)}>
             <ChevronLeftIcon />
             <span>
-              <Indexed text={t("articleAbbr", { number: props.prev })} />
+              <Indexed text={articleLabel(props.prev, props.act.articles)} />
             </span>
           </a>
         ) : (
@@ -209,7 +210,7 @@ export function Contents(props: ContentsProps) {
         {props.next ? (
           <a class="side r" href={articleHref(props.next)}>
             <span>
-              <Indexed text={t("articleAbbr", { number: props.next })} />
+              <Indexed text={articleLabel(props.next, props.act.articles)} />
             </span>
             <ChevronRightIcon />
           </a>
@@ -333,9 +334,9 @@ ${permanent}`}
 export function citationOf(props: RailProps): { sentence: string; permanent: string } {
   const { act, article, actRef, date, now, version } = props;
   return {
-    permanent: `${ORIGIN}${articleUrl(actRef, article.number, version.from)}`,
+    permanent: `${ORIGIN}${articleUrl(actRef, article, version.from)}`,
     sentence: t("citeSentence", {
-      ref: t("articleAbbr", { number: article.number }),
+      ref: articleLabel(article, act.articles),
       act: actName(act),
       date: formatRo(date ?? now),
     }),
@@ -356,7 +357,7 @@ export function Rail(props: RailProps) {
       <CitationPanel
         sentence={sentence}
         permanent={permanent}
-        current={date !== null || version !== inForce ? articleUrl(actRef, article.number) : undefined}
+        current={date !== null || version !== inForce ? articleUrl(actRef, article) : undefined}
       />
       {article.rulings.length > 0 && (
         <Panel title={t("rulingsTitle")}>
@@ -376,7 +377,7 @@ export function Rail(props: RailProps) {
         <Freshness act={act} />
         {upcoming && (
           <p>
-            <a href={articleUrl(actRef, article.number, upcoming.from) + keep}>
+            <a href={articleUrl(actRef, article, upcoming.from) + keep}>
               {t("freshNextVersion", { date: formatRo(upcoming.from) })}
             </a>
           </p>
@@ -388,7 +389,7 @@ export function Rail(props: RailProps) {
             <a href={actUrl(actRef, date ?? undefined)}>{wholeAct}</a>
           </li>
           <li>
-            <a href={subscribeUrl(actRef, article.number)}>
+            <a href={subscribeUrl(actRef, article)}>
               <Indexed text={t("toolFeed", { number: article.number })} />
             </a>
           </li>

@@ -55,6 +55,8 @@ export const strings = {
   timelineFuture: "versiune viitoare",
   timelineRangeEnd: "capăt al intervalului comparat",
   articleAbbr: "Art. {number}",
+  articleUnique: "Articol unic",
+  articleTitleSuffix: "titlul {n}",
   statusInForce: "În vigoare",
   statusRepealed: "Abrogat la {date}",
   statusFuture: "Viitor",

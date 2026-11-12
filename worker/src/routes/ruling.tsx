@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { t } from "../text";
+import { articleLabel } from "../lib/article-label";
 import type { AppEnv } from "../lib/store";
 import type { ActObject } from "../lib/types";
 import { actUrl, articleUrl, parsePath, rulingKeyFromRoute } from "../lib/urls";
@@ -28,9 +28,9 @@ rulingRoutes.get("*", async (c, next) => {
     const entry = act?.articles.find((candidate) => candidate.file === file);
     if (!act || !entry) continue;
     affected.push({
-      href: articleUrl(act.alias ?? act.path, entry.number, ruling.binding_from ?? undefined),
+      href: articleUrl(act.alias ?? act.path, entry, ruling.binding_from ?? undefined),
       actHref: actUrl(act.alias ?? act.path),
-      article: t("articleAbbr", { number: entry.number }),
+      article: articleLabel(entry, act.articles),
       act: act.short ?? act.title,
     });
   }

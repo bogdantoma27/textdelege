@@ -94,6 +94,7 @@ export const COUNT_CAP = 1000;
 export interface SitemapEntry {
   actRef: string;
   number: string | null;
+  file: string | null;
   lastmod: string | null;
 }
 
@@ -269,6 +270,7 @@ export function createStore(env: Env): Store {
       return results.map((row) => ({
         actRef: row.act_ref,
         number: row.file === "" ? null : row.number,
+        file: row.file === "" ? null : row.file,
         lastmod: row.lastmod,
       }));
     },

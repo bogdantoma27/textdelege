@@ -1,9 +1,10 @@
 import { normalise } from "./citation";
+import { actPathParts } from "./urls";
 import { ACTS_PAGE, COUNT_CAP, type ActFilter, type ActList, type ActListItem } from "./store";
 import type { ActIndexEntry } from "./types";
 
 function toItem(entry: ActIndexEntry): ActListItem {
-  const [, year, number] = entry.path.split("/");
+  const { year, number } = actPathParts(entry.path);
   const parsedYear = /^[0-9]+$/.test(year ?? "") ? Number(year) : null;
   return {
     path: entry.path,
@@ -13,7 +14,7 @@ function toItem(entry: ActIndexEntry): ActListItem {
     short: entry.short,
     status: entry.status,
     year: parsedYear,
-    number: number ?? null,
+    number: number === "" ? null : number,
     articles: entry.articles,
   };
 }

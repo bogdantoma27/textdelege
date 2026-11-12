@@ -4,7 +4,7 @@ import { CHUNK, candidates, inChunks } from "../lib/compare";
 import { t } from "../text";
 import { resolveAct } from "../lib/resolve";
 import type { AppEnv } from "../lib/store";
-import { articleUrl, compareUrl, parsePath } from "../lib/urls";
+import { articleUrl, compareUrl, findArticle, parsePath } from "../lib/urls";
 import { versionOn } from "../lib/versions";
 import { FLAG_PAIRS, changedRows, renderActCompare, renderCompare } from "../views/compare";
 import { NotFound } from "../views/not-found";
@@ -22,10 +22,10 @@ compareRoutes.get("*", async (c, next) => {
     if (!isIsoDate(de) || !isIsoDate(pana)) return c.notFound();
     const store = c.get("store");
     const act = await resolveAct(store, route.actRef);
-    const entry = act?.articles.find((candidate) => candidate.number === route.number);
+    const entry = act === null ? undefined : findArticle(act.articles, route.slug);
     if (!act || !entry) return c.notFound();
     const [from, to] = de <= pana ? [de, pana] : [pana, de];
-    let target = from === to ? articleUrl(route.actRef, route.number, from) : compareUrl(route.actRef, route.number, from, to);
+    let target = from === to ? articleUrl(route.actRef, entry, from) : compareUrl(route.actRef, entry, from, to);
     if (from !== to) {
       const kept = new URLSearchParams();
       for (const [name, value] of FLAG_PAIRS) {
@@ -56,7 +56,7 @@ compareRoutes.get("*", async (c, next) => {
     );
   }
 
-  const entry = act.articles.find((candidate) => candidate.number === route.number);
+  const entry = findArticle(act.articles, route.slug);
   if (!entry) return c.notFound();
   const article = await store.article(act.path, entry.file);
   if (article === null || article.versions.length === 0) return c.notFound();

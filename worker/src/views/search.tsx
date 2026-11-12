@@ -1,3 +1,4 @@
+import { articleLabel } from "../lib/article-label";
 import { t, tPlural } from "../text";
 import type { SearchHit } from "../lib/types";
 import { articleUrl } from "../lib/urls";
@@ -65,8 +66,8 @@ function Hit({ hit, names }: { hit: SearchHit; names: ActNames }) {
   return (
     <li class="hit">
       <h2 class="hit-head">
-        <a href={articleUrl(act.ref, hit.number)}>
-          {act.name}, <Indexed text={t("articleAbbr", { number: hit.number })} />
+        <a href={articleUrl(act.ref, hit)}>
+          {act.name}, <Indexed text={articleLabel(hit)} />
           {hit.title ? `: ${hit.title}` : ""}
         </a>
         {hit.state !== "in-force" && (

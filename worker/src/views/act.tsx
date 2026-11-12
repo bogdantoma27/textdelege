@@ -11,9 +11,10 @@ import {
   paginate,
 } from "../lib/act";
 import { dayBefore, formatRo } from "../lib/dates";
-import { linkCrossReferences } from "../lib/text";
+import { articleLabel } from "../lib/article-label";
+import { linkCrossReferences, linkableNumbers } from "../lib/text";
 import type { ActArticleEntry, ActObject, ArticleObject, ArticleRuling, LawObject, TimelineEntry } from "../lib/types";
-import { actUrl, articleSlug, articleUrl, changesUrl, compareUrl, lawUrlFromKey, subscribeUrl } from "../lib/urls";
+import { type ArticleRef, actUrl, articleSlugFor, articleUrl, changesUrl, compareUrl, lawUrlFromKey, subscribeUrl } from "../lib/urls";
 import { resolveView } from "../lib/versions";
 import { Paragraph } from "./article";
 import { CitationPanel, Contents, Freshness, FreshnessWarning } from "./article-rails";
@@ -229,9 +230,10 @@ function ArticleBlock(props: {
   entry: ActArticleEntry;
   article: ArticleObject | null;
   numbers: ReadonlySet<string>;
+  articles: readonly ArticleRef[];
 }) {
-  const { ctx, actRef, entry, article, numbers } = props;
-  const slug = articleSlug(entry.number);
+  const { ctx, actRef, entry, article, numbers, articles } = props;
+  const slug = articleSlugFor(entry);
   const view = article === null ? null : resolveView(article, ctx.date, ctx.now);
   let badge: BadgeId | null = null;
   if (view !== null && view.kind !== "exact") {
@@ -241,8 +243,8 @@ function ArticleBlock(props: {
   return (
     <section class="art" id={slug}>
       <h3>
-        <a href={articleUrl(actRef, entry.number, ctx.date ?? undefined)}>
-          <Indexed text={t("articleAbbr", { number: entry.number })} />
+        <a href={articleUrl(actRef, entry, ctx.date ?? undefined)}>
+          <Indexed text={articleLabel(entry, articles)} />
         </a>
         {entry.title && ` ${entry.title}`}
         {badge !== null && (
@@ -293,7 +295,7 @@ function FullText(props: {
   const { paged } = text;
   const first = paged.items[0];
   const last = paged.items[paged.items.length - 1];
-  const numbers = new Set(act.articles.map((entry) => entry.number));
+  const numbers = linkableNumbers(act.articles);
   return (
     <section aria-labelledby="textul">
       <h2 id="textul">{t("actFullTextHeading")}</h2>
@@ -326,6 +328,7 @@ function FullText(props: {
           entry={entry}
           article={text.articles[index] ?? null}
           numbers={numbers}
+          articles={act.articles}
         />
       ))}
       <Pages
@@ -388,10 +391,10 @@ function History(props: {
   );
 }
 
-function groupRulings(rows: ArticleRuling[]): { number: string; title: string | null; rows: ArticleRuling[] }[] {
-  const groups = new Map<string, { number: string; title: string | null; rows: ArticleRuling[] }>();
+function groupRulings(rows: ArticleRuling[]): { number: string; file: string; title: string | null; rows: ArticleRuling[] }[] {
+  const groups = new Map<string, { number: string; file: string; title: string | null; rows: ArticleRuling[] }>();
   for (const row of rows) {
-    const group = groups.get(row.file) ?? { number: row.number, title: row.title, rows: [] };
+    const group = groups.get(row.file) ?? { number: row.number, file: row.file, title: row.title, rows: [] };
     group.rows.push(row);
     groups.set(row.file, group);
   }
@@ -429,8 +432,8 @@ function Rulings(props: { act: ActObject; actRef: string; byArticle: ArticleRuli
       {groups.map((group) => (
         <>
           <h3>
-            <a href={articleUrl(actRef, group.number)}>
-              <Indexed text={t("articleAbbr", { number: group.number })} />
+            <a href={articleUrl(actRef, group)}>
+              <Indexed text={articleLabel(group, act.articles)} />
             </a>
             {group.title && ` ${group.title}`}
           </h3>
@@ -482,8 +485,8 @@ function Statistics(props: { act: ActObject; actRef: string }) {
           <ul class="plain columns">
             {most.map((item) => (
               <li>
-                <a href={articleUrl(actRef, item.number)}>
-                  <Indexed text={t("articleAbbr", { number: item.number })} />
+                <a href={articleUrl(actRef, item)}>
+                  <Indexed text={articleLabel(item, act.articles)} />
                   {item.title ? ` ${item.title}` : ""}
                 </a>
                 <small>{t("tocChanges", { n: item.changes })}</small>

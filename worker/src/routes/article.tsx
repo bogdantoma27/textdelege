@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { parseDate, today } from "../lib/dates";
 import { resolveAct } from "../lib/resolve";
 import type { AppEnv } from "../lib/store";
-import { articleUrl, parsePath } from "../lib/urls";
+import { articleUrl, findArticle, parsePath } from "../lib/urls";
 import { versionOn } from "../lib/versions";
 import { renderArticle } from "../views/article";
 
@@ -16,7 +16,7 @@ articleRoutes.get("*", async (c, next) => {
 
   const store = c.get("store");
   const act = await resolveAct(store, route.actRef);
-  const entry = act?.articles.find((candidate) => candidate.number === route.number);
+  const entry = act === null ? undefined : findArticle(act.articles, route.slug);
   if (!act || !entry) return c.notFound();
   const article = await store.article(act.path, entry.file);
   if (article === null || article.versions.length === 0) return c.notFound();
@@ -28,7 +28,7 @@ articleRoutes.get("*", async (c, next) => {
     const picked = parsed === today() ? "" : parsed;
     params.delete("data");
     const rest = params.toString();
-    const target = articleUrl(route.actRef, route.number, picked === "" ? undefined : picked);
+    const target = articleUrl(route.actRef, entry, picked === "" ? undefined : picked);
     return c.redirect(rest === "" ? target : `${target}?${rest}`, 302);
   }
 
@@ -37,7 +37,7 @@ articleRoutes.get("*", async (c, next) => {
     const current = versionOn(article, today());
     if (shown !== null && current !== null && shown.version === current.version) {
       const rest = params.toString();
-      const target = articleUrl(route.actRef, route.number);
+      const target = articleUrl(route.actRef, entry);
       return c.redirect(rest === "" ? target : `${target}?${rest}`, 302);
     }
   }

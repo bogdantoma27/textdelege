@@ -1,3 +1,4 @@
+import { articleLabel } from "../lib/article-label";
 import type { Child } from "hono/jsx";
 import { t, tPlural } from "../text";
 import { type OrderedAct, actName, isCurrent, ordered } from "../lib/act-order";
@@ -26,8 +27,8 @@ export const actOf = (item: ChangeItem, names: ActNames) =>
 
 export function changeArticle(item: ChangeItem, names: ActNames): Child {
   return (
-    <a href={articleUrl(actOf(item, names).ref, item.number, item.date)}>
-      <Indexed text={t("articleAbbr", { number: item.number })} />
+    <a href={articleUrl(actOf(item, names).ref, item, item.date)}>
+      <Indexed text={articleLabel(item)} />
       {item.title ? ` ${item.title}` : ""}
     </a>
   );
@@ -231,8 +232,8 @@ function FilterForm({ page }: { page: ChangesPage }) {
 function crumbs(page: ChangesPage) {
   const home = { href: "/", label: t("breadcrumbHome") };
   if (page.path === "/modificari") return [home];
-  const ref = page.path.split("/")[2];
-  const act = [...page.names.values()].find((item) => item.ref === ref);
+  const rest = page.path.replace(/^\/modificari\//, "");
+  const act = [...page.names.values()].find((item) => rest === item.ref || rest.startsWith(`${item.ref}/`));
   return act === undefined ? [home] : [home, { href: actUrl(act.ref), label: act.name }];
 }
 
