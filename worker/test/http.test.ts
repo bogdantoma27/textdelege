@@ -131,8 +131,17 @@ describe("page cache", () => {
     expect((await get("/cauta?q=art.+1+Codul+civil")).status).toBe(302);
   });
 
-  it("keeps the home page and the health check out of the cache, and errors too", async () => {
-    for (const path of ["/", "/healthz", "/nu-exista"]) {
+  it("stores the home page in a few variants", async () => {
+    const first = await get("/");
+    expect(first.status).toBe(200);
+    expect(first.headers.get("Cache-Control")).toBe("public, max-age=300, s-maxage=604800");
+    const seen = new Set<string | null>();
+    for (let i = 0; i < 40; i++) seen.add((await get("/")).headers.get("Cache-Status"));
+    expect(seen.has("textdelege; hit")).toBe(true);
+  });
+
+  it("keeps the health check out of the cache, and errors too", async () => {
+    for (const path of ["/healthz", "/nu-exista"]) {
       const response = await get(path);
       expect(response.headers.get("Cache-Status")).toBeNull();
       expect(response.headers.get("Cache-Control")).toBeNull();

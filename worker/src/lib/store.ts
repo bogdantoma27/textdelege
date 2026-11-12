@@ -122,6 +122,9 @@ export function toMatchQuery(q: string): string {
     .join(" ");
 }
 
+const RANK = `bm25(articles_fts, 0, 0, 0, 4.0, 8.0, 1.0)
+  * CASE WHEN act_path IN (SELECT path FROM acts WHERE alias IS NOT NULL) THEN 2.0 ELSE 1.0 END`;
+
 const MARK_OPEN = "\uE000";
 const MARK_CLOSE = "\uE001";
 const DEFAULT_LIMIT = 20;
@@ -216,7 +219,7 @@ export function createStore(env: Env): Store {
                 snippet(articles_fts, -1, '${MARK_OPEN}', '${MARK_CLOSE}', '…', 12) AS snippet
            FROM articles_fts
           WHERE articles_fts MATCH ?1 ${stateFilter}
-          ORDER BY bm25(articles_fts)
+          ORDER BY ${RANK}
           LIMIT ?2 OFFSET ?3`,
       )
         .bind(match, clampLimit(limit), clampOffset(offset))

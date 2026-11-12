@@ -106,6 +106,19 @@ describe("store", () => {
     expect(hits[0]).toMatchObject({ actPath: CIVIL, file: "art-0001", title: "Titlu" });
   });
 
+  it("search ranks a title match in a code above repeated words in another act's text", async () => {
+    const insert = "INSERT INTO articles_fts (act_path, file, state, number, title, text) VALUES (?, ?, 'in-force', ?, ?, ?)";
+    await env.DB.prepare(insert)
+      .bind("lege/2020/1", "art-0009", "9", null, "Contractul și contractul, contractul încheiat.")
+      .run();
+    await env.DB.prepare(insert).bind(CIVIL, "art-0010", "10", "Contractul", "Părțile se obligă.").run();
+    const hits = await createStore(env).search("contractul", true, 10);
+    expect(hits.map((hit) => [hit.actPath, hit.file])).toEqual([
+      [CIVIL, "art-0010"],
+      ["lege/2020/1", "art-0009"],
+    ]);
+  });
+
   it("search respects the limit and falls back for a non-numeric one", async () => {
     const store = createStore(env);
     expect(await store.search("doilea", true, 1)).toHaveLength(1);

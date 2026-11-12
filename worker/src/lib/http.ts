@@ -44,8 +44,8 @@ export const securityHeaders: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.res = response;
 };
 
-// Never cache these: the home page is random, healthz is live.
-const UNCACHED = new Set(["/", "/healthz"]);
+const UNCACHED = new Set(["/healthz"]);
+const HOME_VARIANTS = 4;
 
 const CACHE_CONTROL = "public, max-age=300, s-maxage=604800";
 
@@ -59,7 +59,8 @@ export const pageCache: MiddlewareHandler<AppEnv> = async (c, next) => {
     return next();
   }
   const version = c.env.CF_VERSION_METADATA?.id ?? "";
-  const key = new Request(`${url.origin}/_cache/${build}/${version}/${today()}${url.pathname}${url.search}`);
+  const variant = url.pathname === "/" ? `~${Math.floor(Math.random() * HOME_VARIANTS)}` : "";
+  const key = new Request(`${url.origin}/_cache/${build}/${version}/${today()}${variant}${url.pathname}${url.search}`);
   const cache = caches.default;
   const fresh = /\bno-cache\b/.test(c.req.header("Cache-Control") ?? "");
   const stored = fresh ? undefined : await cache.match(key);
