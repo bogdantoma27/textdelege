@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 from build.tests.fixture import FixtureRepo
-from build.tests.sourcerepo import CIVIL, PROCEDURE, SourceRepo
+from build.tests.sourcerepo import CIVIL, PROCEDURE, SourceRepo, pin_reader
 from build.tests.test_cli import TODAY, run
 from build.textdelege import cli, extractcache
 from build.textdelege.extract import (
@@ -63,11 +63,18 @@ class FingerprintTest(unittest.TestCase):
         labels = {"legea-1-2020": "Legea nr. 1/2020", "legea-9-2020": "Renamed", "new": "New"}
         self.assertEqual(key_for(), key_for(law_labels=labels))
 
-    def test_code_hash_follows_the_package_sources(self):
+    def test_code_hash_follows_the_extraction_sources_only(self):
         first = extractcache.code_hash()
         self.assertEqual(first, extractcache.code_hash())
-        with mock.patch.object(Path, "read_bytes", return_value=b"changed"):
+        real = Path.read_bytes
+
+        def changed(name):
+            return lambda path: b"changed" if path.name == name else real(path)
+
+        with mock.patch.object(Path, "read_bytes", changed("extract.py")):
             self.assertNotEqual(first, extractcache.code_hash())
+        with mock.patch.object(Path, "read_bytes", changed("cli.py")):
+            self.assertEqual(first, extractcache.code_hash())
 
 
 class RoundTripTest(unittest.TestCase):
@@ -167,6 +174,7 @@ class IncrementalBuildTest(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.tmp = Path(tmp.name)
         self.source = SourceRepo(self.tmp / "source")
+        pin_reader(self)
         self.cache = self.tmp / "work" / ".cache"
         self.config = self.tmp / "work" / "config.toml"
         self.config.parent.mkdir()
@@ -272,7 +280,15 @@ class IncrementalBuildTest(unittest.TestCase):
             oracle=lambda s: "text that differs\n",
         )
         self.assertEqual(code, 1)
-        self.assertFalse((self.cache / extractcache.CACHE_DIR).exists())
+        self.assertEqual(self.entries(self.cache), [])
+
+    def test_each_act_is_stored_as_soon_as_it_is_extracted(self):
+        with mock.patch.object(cli, "run_checks", side_effect=RuntimeError("stopped")):
+            code, _stdout, _stderr, _calls = self.run_build("--dry-run", "--workers", "1")
+        self.assertNotEqual(code, 0)
+        self.assertEqual(len(self.entries(self.cache)), 2)
+        code, stdout, stderr, calls = self.run_build("--dry-run")
+        self.assertEqual((code, stderr, calls), (0, "", []), stdout)
 
     def test_verify_subcommand_neither_reads_nor_writes_the_cache(self):
         argv = ["verify", "--config", str(self.config), *SAMPLE]
@@ -470,6 +486,7 @@ class RemoteCacheTest(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.tmp = Path(tmp.name)
         self.r2 = RecordingR2()
+        pin_reader(self)
         source = FixtureRepo(self.tmp / "src")
         source.commit(
             {f"{FOLDER}/art-0001.md": article(1, "(1) Text.")}, author=LAW_A,

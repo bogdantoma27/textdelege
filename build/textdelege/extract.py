@@ -122,9 +122,38 @@ def _number_from_file(name: str) -> str:
     return f"{number}^{int(match.group(2))}" if match.group(2) is not None else number
 
 
-def _sort_key(name: str) -> tuple[int, int]:
-    match = FILE_STEM.fullmatch(name)
-    return int(match.group(1)), int(match.group(2) or 0)
+ROMAN = re.compile(r"m*(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})")
+ROMAN_VALUES = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000}
+
+
+def _roman_value(text: str) -> int:
+    total = 0
+    for current, following in zip(text, text[1:] + " "):
+        value = ROMAN_VALUES[current]
+        total += -value if ROMAN_VALUES.get(following, 0) > value else value
+    return total
+
+
+def _suffix_key(groups: list[str]) -> tuple:
+    return tuple((0, int(g), "") if g.isdigit() else (1, 0, g) for g in groups)
+
+
+def _group_key(groups: list[str]) -> tuple:
+    first, rest = groups[0], groups[1:]
+    if first.isdigit():
+        return (0, int(first), "", _suffix_key(rest))
+    if first == "unic":
+        return (-1, 0, "", _suffix_key(rest))
+    if ROMAN.fullmatch(first):
+        return (1, _roman_value(first), "", _suffix_key(rest))
+    return (2, 0, first, _suffix_key(rest))
+
+
+def _sort_key(name: str) -> tuple:
+    groups = name.removeprefix("art-").removesuffix(".md").split("-")
+    if len(groups) > 1 and re.fullmatch(r"t\d+", groups[0]):
+        return (3, int(groups[0][1:]), _group_key(groups[1:]), name)
+    return (*_group_key(groups), name)
 
 
 def version_on(article: Article, day: date) -> Version | None:

@@ -1,12 +1,15 @@
+import hashlib
 import os
 import tempfile
 import time
 import unittest
 import unittest.mock
+from unittest import mock
 from datetime import date, timedelta
 from pathlib import Path
 
 from build.tests.fixture import FixtureRepo
+from build.textdelege import verify as verify_module
 from build.textdelege.extract import Article, Line, Version
 from build.textdelege.gitrepo import GitRepo
 from build.textdelege.verify import (
@@ -15,6 +18,7 @@ from build.textdelege.verify import (
     normalise,
     oracle_environment,
     oracle_text,
+    ReaderNotReviewed,
     prepare_script,
     sample,
     verify,
@@ -200,12 +204,41 @@ class OracleTest(unittest.TestCase):
                 message="reader",
             )
             repo = GitRepo(tmp / "src")
-            path = prepare_script(repo, tmp / "bin")
+            with mock.patch.object(verify_module, "READER_SHA256", hashlib.sha256(script.encode()).hexdigest()):
+                path = prepare_script(repo, tmp / "bin")
             self.assertEqual(path, tmp / "bin" / "on.py")
+            self.assertEqual(path.read_bytes(), script.encode())
             hit = oracle_text(repo.path, Sample("act", "art-1.md", date(2020, 5, 5)), path)
             self.assertEqual(hit, "# Articolul 1\n\ntext\n")
             miss = oracle_text(repo.path, Sample("act", "art-1.md", date(2020, 5, 6)), path)
             self.assertIsNone(miss)
+
+    def test_a_reader_that_differs_from_the_pin_is_not_written(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            fixture = FixtureRepo(tmp / "src")
+            fixture.commit(
+                {"tools/on.py": "print('changed')\n"},
+                author="Lexifina",
+                trailers={"Kind": "documentation"},
+                message="reader",
+            )
+            digest = hashlib.sha256(b"print('changed')\n").hexdigest()
+            with self.assertRaises(ReaderNotReviewed) as caught:
+                prepare_script(GitRepo(tmp / "src"), tmp / "bin")
+            self.assertIn(f"tools/on.py changed upstream (sha256 {digest})", str(caught.exception))
+            self.assertIn("verification skipped until the new reader is reviewed", str(caught.exception))
+            self.assertFalse((tmp / "bin" / "on.py").exists())
+
+    def test_a_missing_reader_is_not_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            fixture = FixtureRepo(tmp / "src")
+            fixture.commit(
+                {"other.txt": "x\n"}, author="Lexifina", trailers={"Kind": "documentation"}, message="x"
+            )
+            with self.assertRaises(ReaderNotReviewed):
+                prepare_script(GitRepo(tmp / "src"), tmp / "bin")
 
     def write_script(self, body):
         tmp = tempfile.TemporaryDirectory()

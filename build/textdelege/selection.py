@@ -4,7 +4,7 @@ from datetime import date
 from .gitrepo import Commit, GitRepo
 
 EXCLUDED_KINDS = {"ruling", "documentation"}
-ARTICLE_FILE = re.compile(r"art-\d+(-\d+)?\.md")
+ARTICLE_FILE = re.compile(r"art-[0-9a-z]+(-[0-9a-z]+)*\.md")
 
 
 def in_force_of(commit: Commit) -> date | None:

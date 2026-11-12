@@ -18,6 +18,7 @@ from build.textdelege.publish import (
     digest,
     fts_rowid,
     publish,
+    read_snapshot,
     schema_statements,
     write_index_sql,
 )
@@ -315,6 +316,32 @@ class PublishTest(unittest.TestCase):
                 r2.store[SNAPSHOT_KEY] = body
                 self.run_publish(r2=r2, d1=d1)
                 self.assertTrue(d1.batches[0][0].startswith("DROP TABLE IF EXISTS acts"))
+
+    def test_a_failed_snapshot_read_stops_the_publish_instead_of_a_full_load(self):
+        log = []
+        r2, d1 = FakeR2(log), FakeD1(log)
+        with mock.patch.object(r2, "get", side_effect=OSError("connection reset")):
+            with self.assertRaises(OSError):
+                self.run_publish(r2=r2, d1=d1)
+        self.assertEqual(d1.batches, [])
+        self.assertEqual(r2.store, {})
+
+    def test_read_snapshot_returns_none_only_for_a_missing_or_unusable_object(self):
+        r2 = FakeR2([])
+        self.assertIsNone(read_snapshot(r2))
+        r2.store[SNAPSHOT_KEY] = b"\x1f\x8bnot gzip"
+        self.assertIsNone(read_snapshot(r2))
+        r2.store[SNAPSHOT_KEY] = json.dumps(
+            {"schema_version": SCHEMA_VERSION, "objects": {}, "rows": {"acts": 3}}
+        ).encode()
+        self.assertIsNone(read_snapshot(r2))
+        r2.store[SNAPSHOT_KEY] = json.dumps(
+            {"schema_version": SCHEMA_VERSION, "objects": {}, "rows": {}}
+        ).encode()
+        self.assertEqual(read_snapshot(r2)["rows"], {table: {} for table in TABLES})
+        with mock.patch.object(r2, "get", side_effect=OSError("boom")):
+            with self.assertRaises(OSError):
+                read_snapshot(r2)
 
     def test_plain_json_snapshot_is_read_too(self):
         self.run_publish()

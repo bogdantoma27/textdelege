@@ -11,12 +11,13 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
-from build.tests.sourcerepo import ARTICLE_1, CIVIL, OTHER, PROCEDURE, RULING_KEY, SourceRepo
+from build.tests.sourcerepo import ARTICLE_1, CIVIL, OTHER, PROCEDURE, RULING_KEY, SourceRepo, pin_reader
 from build.textdelege import cli
 from build.textdelege.acts import ActMeta
 from build.textdelege.d1 import SCHEMA_VERSION, D1Error, D1QuotaExceeded
 from build.textdelege.extract import Article, Line, Version
 from build.textdelege.gitrepo import GitError
+from build.textdelege import publish as publish_module
 from build.textdelege.publish import IndexRows
 from build.textdelege.verify import Mismatch, Sample
 
@@ -157,6 +158,24 @@ class SearchRowsTest(unittest.TestCase):
         row = rows.articles_fts[0]
         self.assertEqual((row["number"], row["title"], row["text"]), ("1", "Titlu", "Text forged end"))
 
+    def test_long_article_text_is_cut_to_fit_one_d1_statement(self):
+        word = "Ștefăniță "
+        line = Line(text=word * 20_000, id="alin-1", since=TODAY, law_key="")
+        version = Version(
+            from_=TODAY, until=None, commit="c", law_commit="c", law_key="", law_label="",
+            kind="law", lines=[line],
+        )
+        article = Article(
+            file="art-1", number="1", title=None, versions=[version], state="in-force", repealed_on=None,
+        )
+        rows = IndexRows()
+        cli._add_article_rows(rows, "lege/1/1", "art-1", article, [], TODAY)
+        text = rows.articles_fts[0]["text"]
+        self.assertLessEqual(len(text.encode("utf-8")), cli.FTS_TEXT_BYTES)
+        self.assertTrue(text.startswith("Ștefăniță Ștefăniță"))
+        self.assertTrue(text.endswith("Ștefăniță"))
+        publish_module._insert("articles_fts", {**rows.articles_fts[0], "act_path": "lege/1/1"})
+
 
 class CliTest(unittest.TestCase):
     def setUp(self):
@@ -164,6 +183,7 @@ class CliTest(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.tmp = Path(tmp.name)
         self.source = SourceRepo(self.tmp / "source")
+        pin_reader(self)
         self.cache = self.tmp / "work" / ".cache"
         self.config = self.tmp / "work" / "config.toml"
         self.config.parent.mkdir()
@@ -278,6 +298,36 @@ class CliTest(unittest.TestCase):
         self.assertIn(CIVIL, stdout)
         self.assertFalse((self.cache / "state.json").exists())
         self.assertFalse((self.cache / "out").exists())
+
+    def test_changed_reader_skips_verification_and_still_builds(self):
+        pin_reader(self, "0" * 64)
+        summary = self.tmp / "summary.md"
+        with mock.patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": str(summary)}):
+            code, stdout, stderr = self.build()
+        self.assertEqual(code, 0, stdout)
+        for stream in (stdout, stderr):
+            self.assertIn("tools/on.py changed upstream (sha256 ", stream)
+            self.assertIn("verification skipped until the new reader is reviewed", stream)
+        self.assertIn("Mismatches: 0", stdout)
+        self.assertIn("verification skipped", summary.read_text(encoding="utf-8"))
+        self.assertTrue((self.cache / "state.json").exists())
+        self.assertTrue((self.cache / "out").exists())
+
+    def test_changed_reader_keeps_the_cache_entries(self):
+        self.build()
+        before = sorted(p.name for p in self.cache.rglob("*") if p.is_file() and "extract" in str(p))
+        pin_reader(self, "0" * 64)
+        self.source.amend_article("Titlu\n(1) Nou.\n", "2025-01-01")
+        code, stdout, _ = self.build()
+        self.assertEqual(code, 0, stdout)
+        self.assertTrue(set(before) <= {p.name for p in self.cache.rglob("*") if p.is_file()})
+
+    def test_verify_subcommand_fails_when_the_reader_changed(self):
+        pin_reader(self, "0" * 64)
+        code, stdout, stderr = run(["verify", "--config", str(self.config), "--sample", "3"])
+        self.assertEqual(code, 1)
+        self.assertIn("tools/on.py changed upstream (sha256 ", stderr)
+        self.assertNotIn("verified", stdout)
 
     def test_verify_subcommand_checks_without_writing(self):
         argv = ["verify", "--config", str(self.config), "--sample", "3", "--seed", "1"]

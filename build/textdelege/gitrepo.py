@@ -252,6 +252,22 @@ class GitRepo:
             return None
         raise GitError(["git", "show", f"{sha}:{path}"], result.stderr, result.returncode)
 
+    def show_bytes(self, sha: str, path: str) -> bytes | None:
+        result = subprocess.run(
+            ["git", "show", f"{sha}:{path}"],
+            cwd=self.path,
+            env={**os.environ, "LC_ALL": "C"},
+            check=False,
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            return result.stdout
+        stderr = result.stderr.decode("utf-8", errors="replace")
+        if any(marker in stderr for marker in MISSING_PATH_MARKERS):
+            self._git("rev-parse", "--verify", "--quiet", f"{sha}^{{tree}}")
+            return None
+        raise GitError(["git", "show", f"{sha}:{path}"], stderr, result.returncode)
+
     @classmethod
     def clone(cls, url: str, dest: Path) -> "GitRepo":
         dest = Path(dest).resolve()

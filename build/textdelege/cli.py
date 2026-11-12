@@ -44,7 +44,7 @@ from .rulings import (
     load_rulings,
     rulings_by_article,
 )
-from .verify import Mismatch, Sample, sample, verify
+from .verify import Mismatch, ReaderNotReviewed, Sample, sample, verify
 
 PACKAGE = Path(__file__).resolve().parent
 DEFAULT_CONFIG = PACKAGE.parent / "config.toml"
@@ -72,6 +72,7 @@ RECLONED_URL = "source URL changed: fresh clone"
 RECLONED_BROKEN = "cached clone could not be fetched: fresh clone"
 BUCHAREST = ZoneInfo("Europe/Bucharest")
 DIFF_LINES = 40
+FTS_TEXT_BYTES = 90_000
 
 
 class PipelineError(Exception):
@@ -89,7 +90,6 @@ class Extracted:
     history_blobs: int = 0
     head_blobs: int = 0
     fresh_acts: set[str] | None = None
-    pending_cache: list[tuple[str, str, list]] = field(default_factory=list)
     missing: int = 0
     timings: dict[str, float] = field(default_factory=dict)
 
@@ -246,7 +246,6 @@ def extract_source(
     extract_started = time.monotonic()
     articles_by_act = {}
     fresh: set[str] = set()
-    pending = []
     code = extractcache.code_hash()
     newest: dict[str, str | None] = {}
     if use_cache:
@@ -288,6 +287,8 @@ def extract_source(
             repo, meta.path, old_folders[meta.path],
             credits=credits_of[meta.path], law_labels=labels,
         )
+        if use_cache:
+            extractcache.store(config.cache_dir, meta.path, keys[meta.path], cores, r2=r2)
         return cores, blobs
 
     extracted: dict[str, list] = {}
@@ -309,14 +310,12 @@ def extract_source(
             if cores is None:
                 continue
             fresh.add(meta.path)
-            if use_cache:
-                pending.append((meta.path, keys[meta.path], cores))
         articles_by_act[meta.path] = finalize_act(cores, today)
     missing = len(metas) - len(articles_by_act)
     if missing:
         return Extracted(
             metas, old_folders, articles_by_act, laws_csv, rulings_by_provision, [],
-            history_blobs, head_blobs, fresh_acts=fresh, pending_cache=pending, missing=missing,
+            history_blobs, head_blobs, fresh_acts=fresh, missing=missing,
             timings={"fetch": fetch_seconds, "extract": time.monotonic() - extract_started},
         )
     rulings, warnings = load_rulings(repo, selected, rulings_by_provision, decisions_csv)
@@ -326,7 +325,6 @@ def extract_source(
         metas, old_folders, articles_by_act, laws_csv, rulings_by_provision, rulings,
         history_blobs, head_blobs,
         fresh_acts=fresh if use_cache and len(fresh) < len(metas) else None,
-        pending_cache=pending,
         timings={"fetch": fetch_seconds, "extract": time.monotonic() - extract_started},
     )
 
@@ -454,6 +452,14 @@ def _searchable(value: str | None) -> str | None:
     return None if value is None else value.translate(_SNIPPET_MARKERS)
 
 
+def _fits(text: str, limit: int) -> str:
+    encoded = text.encode("utf-8")
+    if len(encoded) <= limit:
+        return text
+    cut = encoded[:limit].decode("utf-8", errors="ignore")
+    return cut.rsplit(" ", 1)[0] if " " in cut else cut
+
+
 def _add_article_rows(
     rows: IndexRows, path: str, stem: str, article: Article, events, today: date
 ) -> None:
@@ -479,9 +485,9 @@ def _add_article_rows(
     rows.articles_fts.append({
         "act_path": path, "file": stem, "state": article.state,
         "number": _searchable(article.number), "title": _searchable(article.title),
-        "text": _searchable(
+        "text": _fits(_searchable(
             " ".join(" ".join(line.text.split()) for line in current.lines) if current else ""
-        ),
+        ), FTS_TEXT_BYTES),
     })
 
 
@@ -524,13 +530,16 @@ def print_mismatches(mismatches: list[Mismatch]) -> None:
 
 def run_checks(
     repo: GitRepo, data: Extracted, n: int, seed: int | None, today: date, oracle
-) -> tuple[list[Sample], list[Mismatch], int]:
+) -> tuple[list[Sample], list[Mismatch], int, str | None]:
     seed = int(repo.head()[:8], 16) if seed is None else seed
     samples = sample(data.articles_by_act, n, seed, today, fresh=data.fresh_acts)
-    mismatches = verify(
-        repo, data.articles_by_act, samples, old_folders=data.old_folders, oracle=oracle
-    )
-    return samples, mismatches, seed
+    try:
+        mismatches = verify(
+            repo, data.articles_by_act, samples, old_folders=data.old_folders, oracle=oracle
+        )
+    except ReaderNotReviewed as error:
+        return [], [], seed, str(error)
+    return samples, mismatches, seed, None
 
 
 def cmd_build(args, *, today, now, oracle, r2, d1) -> int:
@@ -568,14 +577,14 @@ def cmd_build(args, *, today, now, oracle, r2, d1) -> int:
         deadline=None if budget is None else started + budget * 60,
     )
     verify_started = time.monotonic()
-    samples, mismatches, _seed = run_checks(repo, data, args.sample, args.seed, today, oracle)
+    samples, mismatches, _seed, skipped = run_checks(repo, data, args.sample, args.seed, today, oracle)
+    if skipped:
+        print(skipped)
+        print(skipped, file=sys.stderr)
+        note = "; ".join(part for part in (note, skipped) if part)
     verify_seconds = time.monotonic() - verify_started
-    if not mismatches:
-        with ThreadPoolExecutor(max_workers=NEWEST_WORKERS) as pool:
-            list(pool.map(
-                lambda entry: extractcache.store(config.cache_dir, *entry, r2=r2),
-                data.pending_cache,
-            ))
+    for act_path in sorted({item.sample.act_path for item in mismatches}):
+        extractcache.drop(config.cache_dir, act_path, r2)
     if data.missing:
         if mismatches:
             print_mismatches(mismatches)
@@ -652,7 +661,11 @@ def cmd_verify(args, *, today, oracle, d1, **_unused) -> int:
         if note:
             print(note)
     data = extract_source(repo, config, today)
-    samples, mismatches, seed = run_checks(repo, data, args.sample, args.seed, today, oracle)
+    samples, mismatches, seed, skipped = run_checks(repo, data, args.sample, args.seed, today, oracle)
+    if skipped:
+        print(skipped, file=sys.stderr)
+        write_step_summary([("Error", skipped)], None)
+        return 1
     print_mismatches(mismatches)
     print(f"verified {len(samples)} samples (seed {seed}): {len(mismatches)} mismatches")
     return 1 if mismatches else 0

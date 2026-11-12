@@ -379,6 +379,49 @@ class ExtractTest(unittest.TestCase):
             ["art-040.md", "art-040-2.md", "art-040-10.md", "art-041.md"],
         )
 
+    def test_article_order_with_letters_romans_and_title_groups(self):
+        names = [
+            "art-t3-i.md", "art-t1-1.md", "art-t1-unic.md", "art-ii-1.md", "art-ii.md", "art-i.md",
+            "art-x.md", "art-ix.md", "art-270-2-a.md", "art-270-3.md", "art-270-2.md", "art-006-1.md",
+            "art-007.md", "art-006.md", "art-t2-i.md", "art-t2-1.md",
+        ]
+        self.commit({name: article(1, "x") for name in names}, "2020-01-01")
+        self.assertEqual(
+            [a.file for a in self.extract()],
+            [
+                "art-006.md", "art-006-1.md", "art-007.md", "art-270-2.md", "art-270-2-a.md",
+                "art-270-3.md", "art-i.md", "art-ii.md", "art-ii-1.md", "art-ix.md", "art-x.md",
+                "art-t1-unic.md", "art-t1-1.md", "art-t2-1.md", "art-t2-i.md", "art-t3-i.md",
+            ],
+        )
+
+    def test_transitory_articles_keep_their_heading_numbers(self):
+        self.commit(
+            {
+                "art-0001.md": article(1, "Titlu", "(1) text"),
+                "art-i.md": article("I", "(1) primul"),
+                "art-t2-i.md": article("I", "(1) al doilea"),
+                "art-t3-i.md": article("I", "(1) al treilea"),
+                "art-t1-unic.md": article("UNIC", "text"),
+                "art-270-2-a.md": article("270^2 a)", "text"),
+            },
+            "2020-01-01",
+        )
+        articles = self.extract()
+        self.assertEqual(
+            [(a.file, a.number) for a in articles],
+            [
+                ("art-0001.md", "1"),
+                ("art-270-2-a.md", "270^2 a)"),
+                ("art-i.md", "I"),
+                ("art-t1-unic.md", "UNIC"),
+                ("art-t2-i.md", "I"),
+                ("art-t3-i.md", "I"),
+            ],
+        )
+        self.assertTrue(all(a.state == "in-force" for a in articles))
+        self.assertEqual(articles[3].versions[0].lines[0].text, "text")
+
 
 if __name__ == "__main__":
     unittest.main()

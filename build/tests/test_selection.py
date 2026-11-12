@@ -6,6 +6,7 @@ from pathlib import Path
 from build.tests.fixture import FixtureRepo
 from build.textdelege.gitrepo import GitRepo
 from build.textdelege.selection import (
+    ARTICLE_FILE,
     act_commits,
     commit_for_day,
     in_force_days,
@@ -88,6 +89,21 @@ class SelectionTest(unittest.TestCase):
             self.assertEqual(set(after), {"art-0001.md"})
             self.assertEqual(reader.read(after["art-0001.md"]), "new\n")
         self.assertEqual(tree_for_day(self.repo, commits, date(2010, 1, 1), FOLDER, OLD_FOLDER), {})
+
+
+class ArticleFileTest(unittest.TestCase):
+    def test_accepts_numeric_roman_letter_and_title_group_names(self):
+        for name in (
+            "art-0001.md", "art-006-1.md", "art-270-2-a.md", "art-i.md", "art-ix.md",
+            "art-iii-1.md", "art-t2-i.md", "art-t1-unic.md", "art-t1-1.md",
+        ):
+            with self.subTest(name=name):
+                self.assertTrue(ARTICLE_FILE.fullmatch(name))
+
+    def test_rejects_other_files(self):
+        for name in ("README.md", "art.md", "art-.md", "art-1.txt", "art-A.md", "art--1.md", "x-art-1.md", "art-1-.md", "art-1.md.bak"):
+            with self.subTest(name=name):
+                self.assertFalse(ARTICLE_FILE.fullmatch(name))
 
 
 if __name__ == "__main__":

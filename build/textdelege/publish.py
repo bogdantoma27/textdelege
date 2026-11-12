@@ -168,20 +168,28 @@ def empty_snapshot() -> dict:
 
 
 def read_snapshot(r2: R2Client) -> dict | None:
-    try:
-        snapshot = _read_json(r2, SNAPSHOT_KEY)
-        if (
-            not isinstance(snapshot, dict)
-            or snapshot.get("schema_version") != SCHEMA_VERSION
-            or not isinstance(snapshot.get("objects"), dict)
-            or not isinstance(snapshot.get("rows"), dict)
-        ):
-            return None
-        snapshot["rows"] = {table: dict(snapshot["rows"].get(table) or {}) for table in TABLES}
-        snapshot.setdefault("build", None)
-        return snapshot
-    except Exception:
+    body = r2.get(SNAPSHOT_KEY)
+    if body is None:
         return None
+    try:
+        if body[:2] == b"\x1f\x8b":
+            body = gzip.decompress(body)
+        snapshot = json.loads(body)
+    except (OSError, EOFError, ValueError):
+        return None
+    if (
+        not isinstance(snapshot, dict)
+        or snapshot.get("schema_version") != SCHEMA_VERSION
+        or not isinstance(snapshot.get("objects"), dict)
+        or not isinstance(snapshot.get("rows"), dict)
+    ):
+        return None
+    try:
+        snapshot["rows"] = {table: dict(snapshot["rows"].get(table) or {}) for table in TABLES}
+    except (TypeError, ValueError):
+        return None
+    snapshot.setdefault("build", None)
+    return snapshot
 
 
 def units_of(rows: IndexRows) -> dict[str, dict[str, list[dict]]]:

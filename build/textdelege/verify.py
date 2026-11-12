@@ -1,3 +1,4 @@
+import hashlib
 import os
 import random
 import subprocess
@@ -19,6 +20,7 @@ CACHED_FLOOR = 50
 ORACLE_TIMEOUT_SECONDS = 120
 LOOKBACK_DAYS = 30
 READER_PATH = "tools/on.py"
+READER_SHA256 = "51f7d052c344929e5017cf1a7610f202743376cffd9d97a32f3372f0109c7d9f"
 
 
 @dataclass(frozen=True)
@@ -98,14 +100,26 @@ def sample(
     return result + extras[:BOUNDARY_CAP]
 
 
+class ReaderNotReviewed(Exception):
+    pass
+
+
 def prepare_script(repo: GitRepo, dest_dir: Path) -> Path:
-    text = repo.show_file(repo.head(), READER_PATH)
-    if text is None:
-        raise FileNotFoundError(f"{READER_PATH} is missing from the source repository")
+    data = repo.show_bytes(repo.head(), READER_PATH)
+    if data is None:
+        raise ReaderNotReviewed(
+            f"warning: {READER_PATH} is missing upstream; verification skipped until a reader is reviewed"
+        )
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != READER_SHA256:
+        raise ReaderNotReviewed(
+            f"warning: {READER_PATH} changed upstream (sha256 {digest}); "
+            "verification skipped until the new reader is reviewed"
+        )
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
     script = dest_dir / "on.py"
-    script.write_text(text, encoding="utf-8", newline="\n")
+    script.write_bytes(data)
     return script
 
 

@@ -1,11 +1,14 @@
 import csv
+import hashlib
 import io
 import json
 import subprocess
 from pathlib import Path
+from unittest import mock
 
 from build.tests.fixture import FixtureRepo
 from build.tests.test_rulings import CSV_FIELDS, meta as ruling_meta
+from build.textdelege import verify
 
 CIVIL = "lege/2009/287"
 PROCEDURE = "lege/2010/134"
@@ -39,6 +42,13 @@ for record in log.split("\\x1e"):
 sys.stderr.write(f"{path} was not in the text on {day}\\n")
 sys.exit(1)
 """
+ON_PY_SHA256 = hashlib.sha256(ON_PY.encode("utf-8")).hexdigest()
+
+
+def pin_reader(test, digest: str = ON_PY_SHA256) -> None:
+    patcher = mock.patch.object(verify, "READER_SHA256", digest)
+    patcher.start()
+    test.addCleanup(patcher.stop)
 
 
 def act_row(path, slug, code, short, status="in force"):

@@ -13,13 +13,14 @@ REMOTE_PREFIX = "build-cache/extract/"
 REMOTE_TYPE = "application/gzip"
 FORMAT = 1
 PACKAGE = Path(__file__).resolve().parent
+EXTRACTION_MODULES = ("extract.py", "extractcache.py", "gitrepo.py", "historyindex.py", "selection.py")
 
 
 def code_hash() -> str:
     digest = hashlib.sha256()
-    for path in sorted(PACKAGE.glob("*.py"), key=lambda p: p.name):
-        digest.update(path.name.encode("utf-8") + b"\0")
-        digest.update(path.read_bytes() + b"\0")
+    for name in EXTRACTION_MODULES:
+        digest.update(name.encode("utf-8") + b"\0")
+        digest.update((PACKAGE / name).read_bytes() + b"\0")
     return digest.hexdigest()
 
 
@@ -161,6 +162,17 @@ def load(cache_dir: Path, act_path: str, fingerprint: str, r2=None) -> list[Arti
     if r2 is None:
         return None
     return _load_remote(path, act_path, fingerprint, r2)
+
+
+def drop(cache_dir: Path, act_path: str, r2=None) -> None:
+    path = cache_path(cache_dir, act_path)
+    path.unlink(missing_ok=True)
+    _marker(path).unlink(missing_ok=True)
+    if r2 is not None:
+        try:
+            r2.delete(remote_key(act_path))
+        except Exception as error:
+            print(f"warning: could not delete the cache entry of {act_path}: {error}", file=sys.stderr)
 
 
 def store(cache_dir: Path, act_path: str, fingerprint: str, cores: list[ArticleCore], r2=None) -> None:
