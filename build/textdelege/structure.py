@@ -228,7 +228,7 @@ def _write_local(file: Path, text: str) -> None:
 def _upload(file: Path, path: str, text: str, r2) -> None:
     """Upload unless the marker shows that exactly this content is already in R2."""
     body = gzip.compress(text.encode("utf-8"), mtime=0)
-    digest = hashlib.sha256(body).hexdigest()
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     marker = _marker(file)
     try:
         if marker.read_text(encoding="utf-8") == digest:
@@ -289,7 +289,7 @@ def load(
     if remote is not None and remote[0].get("url") == url and remote[0].get("latest") == day:
         try:
             _write_local(file, remote[1])
-            _marker(file).write_text(hashlib.sha256(remote[2]).hexdigest(), encoding="utf-8")
+            _marker(file).write_text(hashlib.sha256(remote[1].encode("utf-8")).hexdigest(), encoding="utf-8")
         except OSError:
             pass
         return _usable(remote[0]["structure"])
