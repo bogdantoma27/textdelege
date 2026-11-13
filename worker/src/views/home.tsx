@@ -83,7 +83,8 @@ function Hero() {
     <section class="home-hero" aria-labelledby="home-titlu">
       <h1 id="home-titlu">{t("homeHeading")}</h1>
       <p class="lede">{t("homeIntro")}</p>
-      <SearchForm id="q" class="omni hero-search" />
+      <SearchForm id="q" class="omni hero-search" placeholder={t("searchPlaceholderShort")} />
+      <p class="hero-hint">{t("searchHint")}</p>
     </section>
   );
 }

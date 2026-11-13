@@ -173,9 +173,16 @@ class PublishTest(unittest.TestCase):
         self.assertEqual(drops, [f"DROP TABLE IF EXISTS {t}_next" for t in TABLES])
         self.assertIn("CREATE TABLE IF NOT EXISTS meta", first[len(drops)])
         creates = first[len(drops) + 1:]
-        self.assertEqual(len(creates), len(TABLES))
+        tables = [s for s in creates if not s.startswith("CREATE INDEX")]
+        self.assertEqual(len(tables), len(TABLES))
         self.assertTrue(all("_next" in s.splitlines()[0] for s in creates))
-        self.assertFalse(any(s.startswith("CREATE INDEX") for s in first))
+        self.assertEqual(
+            [s for s in first if s.startswith("CREATE INDEX")],
+            [
+                "CREATE INDEX IF NOT EXISTS events_next_unit ON events_next (act_path, file)",
+                "CREATE INDEX IF NOT EXISTS ruling_subjects_next_unit ON ruling_subjects_next (ruling_key)",
+            ],
+        )
         empty = self.r2.snapshots[0]
         self.assertEqual(
             empty,
@@ -422,6 +429,7 @@ class PublishTest(unittest.TestCase):
         self.assertFalse(any(name.endswith("_next") for name in tables))
         indexes = {row["name"] for row in d1.query("SELECT name FROM sqlite_master WHERE type = 'index'")}
         self.assertIn("events_by_date", indexes)
+        self.assertFalse(any(name.endswith("_next_unit") for name in indexes))
         self.assertEqual(
             d1.query("SELECT file FROM articles_fts WHERE articles_fts MATCH 'six'"), [{"file": "art-0006"}]
         )

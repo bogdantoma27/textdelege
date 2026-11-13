@@ -75,6 +75,18 @@ def next_schema_statements() -> list[str]:
     return statements
 
 
+def staging_index_statements() -> list[str]:
+    """Indexes for the per-unit deletes on the staging tables; without them each delete scans the table."""
+    return [
+        f"CREATE INDEX IF NOT EXISTS {table}{NEXT_SUFFIX}_unit ON {table}{NEXT_SUFFIX} ({', '.join(UNIT_COLUMNS[table])})"
+        for table in MULTI_ROW_TABLES
+    ]
+
+
+def staging_index_drops() -> list[str]:
+    return [f"DROP INDEX IF EXISTS {table}{NEXT_SUFFIX}_unit" for table in MULTI_ROW_TABLES]
+
+
 def _next_tables_exist(d1: D1Client) -> bool:
     names = ", ".join(f"'{table}{NEXT_SUFFIX}'" for table in TABLES)
     rows = d1.query(f"SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ({names})")
@@ -282,6 +294,7 @@ def publish(
     schema = [render_statement(statement, []) for statement in schema_statements()]
     if full:
         staging = [render_statement(statement, []) for statement in next_schema_statements()]
+        staging += staging_index_statements()
         if fresh:
             drops = [f"DROP TABLE IF EXISTS {table}{suffix}" for table in TABLES]
             d1.execute_batch(drops + schema[:1] + staging)
@@ -325,7 +338,7 @@ def publish(
     if full:
         snapshot["swapping"] = True
         save()
-        swap = []
+        swap = staging_index_drops()
         for table in TABLES:
             swap.append(f"DROP TABLE IF EXISTS {table}")
             swap.append(f"ALTER TABLE {table}{suffix} RENAME TO {table}")

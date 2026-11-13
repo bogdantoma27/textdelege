@@ -606,6 +606,7 @@ del .vh,ins .vh{user-select:none}
 .home-hero h1{margin:0 0 12px}
 .home-hero .lede{max-width:none;margin:0;color:var(--secondary)}
 .home-hero .hero-search{margin:24px 0 0}
+.home-hero .hero-hint{margin:8px 0 0;font-size:var(--xs);line-height:var(--xs-lh);color:var(--muted)}
 .home-facts{margin:56px 0 0;padding-bottom:48px;font-size:calc(14px*var(--k));line-height:20px;color:var(--muted)}
 .home #coduri .tabs{margin-top:-8px;border-bottom:0}
 .home #coduri .tabs-panel{padding-top:16px}

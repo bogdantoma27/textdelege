@@ -39,6 +39,8 @@ describe("home", () => {
     expect(html).toContain('<body class="home bare-header">');
     const hero = html.slice(html.indexOf('class="home-hero"'), html.indexOf('id="coduri"'));
     expect(hero).toContain('<form class="omni hero-search" role="search"');
+    expect(hero).toContain('placeholder="Caută sau citează un articol"');
+    expect(hero).toContain('<p class="hero-hint">De exemplu: „art. 1112 Codul civil”, „Legea 31/1990”</p>');
     expect(hero.indexOf("<h1")).toBeLessThan(hero.indexOf('class="lede"'));
     expect(hero.indexOf('class="lede"')).toBeLessThan(hero.indexOf('role="search"'));
     for (const gone of ['class="examples"', "source-line", "home-strip", "Încearcă"]) expect(html).not.toContain(gone);

@@ -235,5 +235,5 @@ class ConfigTest(unittest.TestCase):
     def test_repo_config_loads(self):
         cfg = load_config(Path(__file__).parents[1] / "config.toml", {})
         self.assertEqual(cfg.selection, "consolidated")
-        self.assertEqual(cfg.headings_min_articles, 100)
+        self.assertEqual(cfg.headings_min_articles, 20)
         self.assertTrue(cfg.headings)

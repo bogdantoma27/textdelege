@@ -2,7 +2,7 @@ source_url = "https://github.com/lexifina/romania-law"
 selection = "consolidated"
 cache_dir = ".cache"
 headings = true
-headings_min_articles = 100
+headings_min_articles = 20
 
 [r2]
 account_id_env = "R2_ACCOUNT_ID"
