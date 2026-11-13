@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from pathlib import Path
 
@@ -27,6 +28,10 @@ def object_key(kind: str, *parts: str) -> str:
             return "changes/site.json"
         case "changes-act", (path,):
             return f"changes/acts/{path}.json"
+        case "sitemap-index", ():
+            return "sitemaps/index.json"
+        case "sitemap", (number,):
+            return f"sitemaps/{number}.json"
     raise ValueError(f"unknown object kind {kind!r} with {len(parts)} parts")
 
 
@@ -373,3 +378,48 @@ def manifest_object(
         },
         "status": status,
     }
+
+
+SITEMAP_SIZE = 50000
+SITEMAP_FIXED_PAGES = ("/", "/modificari", "/acte", "/despre", "/legenda", "/legislatie")
+_PLAIN_NUMBER = re.compile(r"^[1-9]\d*(?:\^[1-9]\d*)*$")
+
+
+def article_slug(number: str, stem: str) -> str:
+    """The article's address segment: art-52-1 for a plain number, the file stem otherwise."""
+    return "art-" + number.replace("^", "-") if _PLAIN_NUMBER.fullmatch(number) else stem
+
+
+def sitemap_entries(act_rows: list[dict], article_rows: list[dict]) -> list[list]:
+    """[path, lastmod] in sitemap order: the fixed pages, then each act followed by its articles,
+    sorted by act path and file (what the D1 query it replaces returned).
+
+    No dated forms, comparisons or rulings. An act's lastmod is its newest article change."""
+    newest: dict[str, str] = {}
+    for row in article_rows:
+        change = row["last_change"]
+        if change is not None and change > newest.get(row["act_path"], ""):
+            newest[row["act_path"]] = change
+    refs = {row["path"]: row["alias"] or row["path"] for row in act_rows}
+    units: list[tuple[str, str, list]] = [
+        (row["path"], "", [f"/{refs[row['path']]}", newest.get(row["path"])]) for row in act_rows
+    ]
+    for row in article_rows:
+        ref = refs.get(row["act_path"], row["act_path"])
+        slug = article_slug(row["number"], row["file"])
+        units.append((row["act_path"], row["file"], [f"/{ref}/{slug}", row["last_change"]]))
+    units.sort(key=lambda unit: (unit[0].encode("utf-8"), unit[1].encode("utf-8")))
+    return [[path, None] for path in SITEMAP_FIXED_PAGES] + [unit[2] for unit in units]
+
+
+def sitemap_objects(act_rows: list[dict], article_rows: list[dict]) -> list[tuple[str, dict]]:
+    entries = sitemap_entries(act_rows, article_rows)
+    pages = [entries[start:start + SITEMAP_SIZE] for start in range(0, len(entries), SITEMAP_SIZE)]
+    result = [(
+        object_key("sitemap-index"),
+        {"schema": "textdelege/sitemap-index/1", "pages": len(pages), "total": len(entries)},
+    )]
+    for number, page in enumerate(pages, start=1):
+        result.append((object_key("sitemap", str(number)), {"schema": "textdelege/sitemap/1", "entries": page}))
+    return result
+

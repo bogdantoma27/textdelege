@@ -9,7 +9,9 @@ import urllib.error
 from pathlib import Path
 
 from build.tests.test_r2 import FakeOpener, FakeResponse
-from build.textdelege.d1 import SCHEMA_PATH, SCHEMA_VERSION, D1Client, D1Error, D1QuotaExceeded, render_statement, retryable
+from build.textdelege.d1 import (
+    SCHEMA_PATH, SCHEMA_VERSION, D1BudgetExceeded, D1Client, D1Error, D1QuotaExceeded, render_statement, retryable,
+)
 
 SCHEMA_HASHES = {
     1: "86c5b1fb6cc35829e8922d0b4b73751248aa016ac63ec3c3c92e2851603c2bc2",
@@ -30,6 +32,31 @@ class D1Tests(unittest.TestCase):
             f"only rebuilt on a new version) and add `{SCHEMA_VERSION + 1}: \"{digest}\"` to "
             "SCHEMA_HASHES; if the version was bumped already, pin its hash",
         )
+
+    def test_rows_read_and_written_are_added_up_and_capped(self):
+        def reply(read, written):
+            body = {"success": True, "errors": [], "result": [
+                {"results": [], "success": True, "meta": {"rows_read": read, "rows_written": written}},
+                {"results": [], "success": True, "meta": {"rows_read": 1, "rows_written": 0}},
+            ]}
+            return FakeResponse(json.dumps(body).encode())
+
+        op = FakeOpener(reply(10, 2), reply(100, 3), reply(5, 5))
+        c = D1Client("acct", "db", "tok", opener=op, max_rows_read=100, max_rows_written=1000)
+        c.query("a")
+        self.assertEqual((c.rows_read, c.rows_written), (11, 2))
+        with self.assertRaises(D1BudgetExceeded) as caught:
+            c.query("b")
+        self.assertIn("112 rows read, cap 100", str(caught.exception))
+        self.assertEqual(len(op.requests), 2)
+        self.assertFalse(retryable(caught.exception))
+
+    def test_without_caps_nothing_is_limited(self):
+        body = {"success": True, "errors": [], "result": [
+            {"results": [], "success": True, "meta": {"rows_read": 10**12, "rows_written": 10**9}}]}
+        c = D1Client("acct", "db", "tok", opener=FakeOpener(FakeResponse(json.dumps(body).encode())))
+        c.query("a")
+        self.assertEqual(c.rows_read, 10**12)
 
     def test_d1_query_returns_results_and_raises_on_failure(self):
         ok = {"success": True, "errors": [], "result": [{"results": [{"a": 1}], "success": True, "meta": {}}]}

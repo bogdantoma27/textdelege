@@ -272,7 +272,7 @@ describe("the acts page against a database without the new columns", () => {
       },
     });
     const context = { waitUntil: () => {}, passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
-    const response = await app.fetch(new Request("https://example.com/sitemap.xml"), { ...env, DB: db }, context);
+    const response = await app.fetch(new Request("https://example.com/cauta?q=eroare"), { ...env, DB: db }, context);
     expect(response.status).toBe(503);
   });
 });

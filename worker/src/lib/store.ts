@@ -33,8 +33,12 @@ export interface Store {
   changes(scope: string): Promise<ChangesObject | null>;
   search(q: string, inForceOnly: boolean, limit: number, offset?: number): Promise<SearchHit[]>;
   searchCount(q: string, inForceOnly: boolean): Promise<number>;
-  sitemapTotal(): Promise<number>;
-  sitemapEntries(limit: number, offset: number): Promise<SitemapEntry[]>;
+  /** From the build's sitemaps/index.json; null for data published before the build wrote it. */
+  sitemapIndex(): Promise<SitemapIndex | null>;
+  sitemapPage(number: number): Promise<SitemapPage | null>;
+  /** Fallback until the next build has published sitemaps/*.json: counts and sorts the whole index in D1. */
+  legacySitemapTotal(): Promise<number>;
+  legacySitemapEntries(limit: number, offset: number): Promise<SitemapEntry[]>;
   resolveAlias(alias: string): Promise<string | null>;
   actRulings(path: string): Promise<ArticleRuling[]>;
   listActs(filter: ActFilter): Promise<ActList>;
@@ -90,7 +94,27 @@ const FOLDED_NAME = `(${folded("coalesce(title, '')")} || ' ' || ${folded("coale
 
 export const PREFIX_MIN = 4;
 export const COUNT_CAP = 1000;
+/**
+ * Measured on the 76,000-article index: with 10,000 the top 20 of real queries ("contract", 2,524 matches;
+ * "lege", 8,172) are unchanged, while 2,000 dropped 6 of the top 20 for "contract".
+ * Ranking looks at this many matches at most (the first ones, in rowid order); a very common term would
+ * otherwise rank every row. The subquery finds the rowid of the last candidate and the outer query, which
+ * must carry the MATCH for bm25 and snippet, then stops at that rowid.
+ */
+export const RANK_CAP = 10_000;
 
+export interface SitemapIndex {
+  schema: string;
+  pages: number;
+  total: number;
+}
+
+export interface SitemapPage {
+  schema: string;
+  entries: [string, string | null][];
+}
+
+/** Row of the legacy D1 sitemap query. */
 export interface SitemapEntry {
   actRef: string;
   number: string | null;
@@ -161,40 +185,68 @@ interface SearchRow {
   snippet: string;
 }
 
+/** How long an isolate keeps the manifest and the act index before it reads them from R2 again. */
+export const MEMO_MS = 60_000;
+
+class Memo<T> {
+  private entry: { at: number; value: Promise<T> } | undefined;
+
+  get(read: () => Promise<T>): Promise<T> {
+    const held = this.entry;
+    if (held !== undefined && Date.now() - held.at < MEMO_MS) return held.value;
+    const entry = { at: Date.now(), value: read() };
+    this.entry = entry;
+    // A failed read is not kept.
+    entry.value.catch(() => {
+      if (this.entry === entry) this.entry = undefined;
+    });
+    return entry.value;
+  }
+
+  reset(): void {
+    this.entry = undefined;
+  }
+}
+
+const manifestMemo = new Memo<Manifest>();
+const indexMemo = new Memo<ActIndexEntry[]>();
+
+/** For tests: forget what this isolate has memoised. */
+export function resetStoreCache(): void {
+  manifestMemo.reset();
+  indexMemo.reset();
+}
+
 export function createStore(env: Env): Store {
-  let manifestRead: Promise<Manifest> | undefined;
+  const manifest = (): Promise<Manifest> =>
+    manifestMemo.get(() =>
+      readJson<Manifest>(env.DATA, MANIFEST_KEY).then((found) => {
+        if (found === null) {
+          throw new NoBuildError();
+        }
+        return found;
+      }),
+    );
 
-  const manifest = (): Promise<Manifest> => {
-    manifestRead ??= readJson<Manifest>(env.DATA, MANIFEST_KEY).then((found) => {
-      if (found === null) {
-        throw new NoBuildError();
-      }
-      return found;
-    });
-    return manifestRead;
-  };
-
-  let indexRead: Promise<ActIndexEntry[]> | undefined;
-
-  const actIndex = (): Promise<ActIndexEntry[]> => {
-    indexRead ??= manifest().then(async (current) => {
-      const found = await readJson<ActIndex>(env.DATA, INDEX_KEY);
-      return found !== null
-        ? found.acts
-        : current.acts.map((act) => ({
-            path: act.path,
-            alias: act.alias,
-            title: act.title,
-            short: act.short,
-            kind: act.path.split("/")[0] ?? "",
-            status: act.status,
-            from: act.from ?? null,
-            latest: act.latest,
-            articles: act.articles ?? 0,
-          }));
-    });
-    return indexRead;
-  };
+  const actIndex = (): Promise<ActIndexEntry[]> =>
+    indexMemo.get(() =>
+      manifest().then(async (current) => {
+        const found = await readJson<ActIndex>(env.DATA, INDEX_KEY);
+        return found !== null
+          ? found.acts
+          : current.acts.map((act) => ({
+              path: act.path,
+              alias: act.alias,
+              title: act.title,
+              short: act.short,
+              kind: act.path.split("/")[0] ?? "",
+              status: act.status,
+              from: act.from ?? null,
+              latest: act.latest,
+              articles: act.articles ?? 0,
+            }));
+      }),
+    );
 
   const readObject = <T>(key: string): Promise<T | null> => readJson<T>(env.DATA, key);
 
@@ -219,6 +271,7 @@ export function createStore(env: Env): Store {
                 snippet(articles_fts, -1, '${MARK_OPEN}', '${MARK_CLOSE}', '…', 12) AS snippet
            FROM articles_fts
           WHERE articles_fts MATCH ?1 ${stateFilter}
+            AND rowid <= (SELECT max(rowid) FROM (SELECT rowid FROM articles_fts WHERE articles_fts MATCH ?1 ${stateFilter} LIMIT ${RANK_CAP}))
           ORDER BY ${RANK}
           LIMIT ?2 OFFSET ?3`,
       )
@@ -248,14 +301,18 @@ export function createStore(env: Env): Store {
       return row?.total ?? 0;
     },
 
-    async sitemapTotal() {
+    sitemapIndex: () => readObject<SitemapIndex>("sitemaps/index.json"),
+    sitemapPage: (number) => readObject<SitemapPage>(`sitemaps/${number}.json`),
+
+    // LEGACY FALLBACK (remove once every published build carries sitemaps/*.json).
+    async legacySitemapTotal() {
       const row = await env.DB.prepare(
         "SELECT (SELECT COUNT(*) FROM acts) + (SELECT COUNT(*) FROM articles) AS total",
       ).first<{ total: number }>();
       return row?.total ?? 0;
     },
 
-    async sitemapEntries(limit, offset) {
+    async legacySitemapEntries(limit, offset) {
       const { results } = await env.DB.prepare(
         `SELECT u.act_path, COALESCE(ac.alias, u.act_path) AS act_ref, u.file, u.number, u.lastmod FROM (
            SELECT a.path AS act_path, '' AS file, NULL AS number,

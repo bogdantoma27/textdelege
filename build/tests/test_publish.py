@@ -597,5 +597,50 @@ class SqliteTest(unittest.TestCase):
         self.assertEqual(d1.count("events"), 5)
 
 
+class QueryPlanTest(unittest.TestCase):
+    """Every delete the publisher can emit must find its rows through an index.
+
+    A full load once ran 78,683 deletes against a staging table without one; each scanned
+    the whole table and the load read 8.7 billion rows in D1.
+    """
+
+    KEYS = {
+        "acts": "lege/2009/287", "articles": "lege/2009/287|art-0001", "versions": "lege/2009/287|art-0001|0",
+        "laws": "legea-71-2011", "events": "lege/2009/287|art-0001", "rulings": "ccr/2016/405",
+        "ruling_subjects": "ccr/2016/405", "articles_fts": "lege/2009/287|art-0001",
+    }
+
+    def plans(self, suffix):
+        db = sqlite3.connect(":memory:")
+        for statement in publish_module.schema_statements():
+            db.execute(statement)
+        if suffix:
+            for statement in publish_module.next_schema_statements() + publish_module.staging_index_statements():
+                db.execute(statement)
+        for table in publish_module.TABLES:
+            statement = publish_module._delete(table, self.KEYS[table], suffix)
+            detail = " / ".join(row[3] for row in db.execute("EXPLAIN QUERY PLAN " + statement))
+            yield table, statement, detail
+
+    def check(self, suffix):
+        for table, statement, detail in self.plans(suffix):
+            with self.subTest(table=table, suffix=suffix):
+                self.assertIn(f"{table}{suffix}", statement)
+                if table == "articles_fts":
+                    # FTS5 reports a rowid lookup as a "scan" with the equality constraint 0:=.
+                    self.assertIn("VIRTUAL TABLE INDEX 0:=", detail, f"{statement}: {detail}")
+                else:
+                    self.assertNotIn("SCAN", detail, f"{statement} scans the table: {detail}")
+
+    def test_deletes_on_the_live_tables_use_an_index(self):
+        self.check("")
+
+    def test_deletes_on_the_staging_tables_use_an_index(self):
+        self.check(publish_module.NEXT_SUFFIX)
+
+    def test_the_keys_cover_every_table(self):
+        self.assertEqual(set(self.KEYS), set(publish_module.TABLES))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,49 @@
+{
+  "schema": "textdelege/sitemap/1",
+  "entries": [
+    [
+      "/",
+      null
+    ],
+    [
+      "/modificari",
+      null
+    ],
+    [
+      "/acte",
+      null
+    ],
+    [
+      "/despre",
+      null
+    ],
+    [
+      "/legenda",
+      null
+    ],
+    [
+      "/legislatie",
+      null
+    ],
+    [
+      "/codul-civil",
+      "2023-07-09"
+    ],
+    [
+      "/codul-civil/art-1",
+      "2023-07-09"
+    ],
+    [
+      "/codul-civil/art-2",
+      "2011-10-01"
+    ],
+    [
+      "/codul-procedura",
+      "2011-10-01"
+    ],
+    [
+      "/codul-procedura/art-1",
+      "2011-10-01"
+    ]
+  ]
+}

@@ -35,6 +35,8 @@ class Config:
     workers: int | None = None
     headings: bool = False
     headings_min_articles: int = 20
+    d1_max_rows_read: int = 30_000_000
+    d1_max_rows_written: int = 5_000_000
 
 
 def _section(data: dict, name: str, keys: tuple[str, ...], env: Mapping[str, str]):
@@ -70,4 +72,6 @@ def load_config(path: Path, env: Mapping[str, str] = os.environ) -> Config:
         workers=data.get("workers"),
         headings=bool(data.get("headings", False)),
         headings_min_articles=int(data.get("headings_min_articles", 20)),
+        d1_max_rows_read=int(data.get("d1_max_rows_read", 30_000_000)),
+        d1_max_rows_written=int(data.get("d1_max_rows_written", 5_000_000)),
     )

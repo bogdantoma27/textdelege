@@ -1,6 +1,15 @@
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, vi } from "vitest";
+import { resetStoreCache } from "../src/lib/store";
 import { seedIndex, seedObjects } from "./seed";
+
+const entries = new Map<string, { body: ArrayBuffer; status: number; headers: Headers }>();
+
+/** Forget the stored pages and the memoised manifest after a test changed the data. */
+export function clearPageCache(): void {
+  entries.clear();
+  resetStoreCache();
+}
 
 beforeAll(async () => {
   await seedObjects(env);
@@ -8,7 +17,8 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  const entries = new Map<string, { body: ArrayBuffer; status: number; headers: Headers }>();
+  entries.clear();
+  resetStoreCache();
   const url = (key: RequestInfo) => (typeof key === "string" ? key : key.url);
   const cache = {
     match: async (key: RequestInfo) => {

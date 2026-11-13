@@ -241,6 +241,20 @@ class CliTest(unittest.TestCase):
         self.assertEqual(asked, ["https://example.invalid/287"])
         self.assertNotIn("headings", self.out("acts/lege/2010/134/act.json"))
 
+    def test_the_build_emits_the_sitemap_objects(self):
+        code, _, stderr = self.build()
+        self.assertEqual(code, 0, stderr)
+        index = self.out("sitemaps/index.json")
+        self.assertEqual((index["schema"], index["pages"]), ("textdelege/sitemap-index/1", 1))
+        page = self.out("sitemaps/1.json")
+        self.assertEqual(page["schema"], "textdelege/sitemap/1")
+        self.assertEqual(len(page["entries"]), index["total"])
+        paths = [entry[0] for entry in page["entries"]]
+        self.assertEqual(paths[:2], ["/", "/modificari"])
+        self.assertIn("/codul-civil", paths)
+        self.assertIn("/codul-civil/art-1", paths)
+        self.assertLess(paths.index("/codul-civil"), paths.index("/codul-civil/art-1"))
+
     def test_a_failing_portal_never_fails_the_build(self):
         self.config.write_text(
             self.config.read_text(encoding="utf-8") + "headings = true" + chr(10) + "headings_min_articles = 1" + chr(10),

@@ -547,7 +547,7 @@ describe("act comparison", () => {
     expect((await get("/nu-exista/compara/2023-01-01..2023-12-31")).status).toBe(404);
   });
 
-  it("opens only candidate articles, caps them at 300 and says so", () => {
+  it("opens only candidate articles, caps them at 50 and says so", () => {
     const synthetic = structuredClone(act);
     synthetic.articles = [
       ...Array.from({ length: 350 }, (_, i) => entry(i + 1)),
@@ -555,8 +555,8 @@ describe("act comparison", () => {
       entry(901, { first: "2030-01-01", last_change: "2030-01-01" }),
     ];
     const { entries, capped } = candidates(synthetic, "2019-01-01", "2021-01-01");
-    expect(ACT_CAP).toBe(300);
-    expect(entries).toHaveLength(300);
+    expect(ACT_CAP).toBe(50);
+    expect(entries).toHaveLength(50);
     expect(capped).toBe(true);
     expect(entries.some((e) => e.number === "900" || e.number === "901")).toBe(false);
     const few = { ...synthetic, articles: synthetic.articles.slice(0, 5) };
@@ -565,7 +565,7 @@ describe("act comparison", () => {
       capped: false,
     });
     const html = String(renderActCompare(synthetic, [], "2019-01-01", "2021-01-01", true));
-    expect(html).toContain("primele articole care pot fi modificate (cel mult 300)");
+    expect(html).toContain("primele articole care pot fi modificate (cel mult 50)");
   });
 
   it("keeps only the articles with an event in the range", () => {

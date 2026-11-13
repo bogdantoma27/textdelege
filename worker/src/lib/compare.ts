@@ -1,7 +1,7 @@
 import { versionOn } from "./versions";
 import type { ActArticleEntry, ActObject, ArticleEvent, ArticleObject } from "./types";
 
-export const ACT_CAP = 300;
+export const ACT_CAP = 50;
 export const CHUNK = 20;
 
 export function candidates(

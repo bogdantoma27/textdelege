@@ -9,7 +9,13 @@ from build.textdelege.acts import ActMeta
 from build.textdelege.events import events_for
 from build.textdelege.extract import Article, Line, Version
 from build.textdelege.laws import changes_feed, laws_from, upcoming
+from unittest.mock import patch
+
 from build.textdelege.objects import (
+    SITEMAP_FIXED_PAGES,
+    article_slug,
+    sitemap_entries,
+    sitemap_objects,
     act_object,
     article_object,
     changes_object,
@@ -495,3 +501,48 @@ class DocumentationTest(unittest.TestCase):
         broken = {**built, "versions": [{**built["versions"][0], "commit": None}]}
         self.assertNotEqual(shape_differences(example, broken, nullable), [])
         self.assertNotEqual(shape_differences({"a": []}, {"a": ["x"]}, set()), [])
+
+
+class SitemapTest(unittest.TestCase):
+    ACTS = [
+        {"path": "lege/2010/134", "alias": "codul-procedura"},
+        {"path": "lege/2009/287", "alias": "codul-civil"},
+        {"path": "lege/2012/1", "alias": None},
+    ]
+    ARTICLES = [
+        {"act_path": "lege/2009/287", "file": "art-0002", "number": "2", "last_change": "2020-01-01"},
+        {"act_path": "lege/2009/287", "file": "art-0001", "number": "1", "last_change": "2023-07-09"},
+        {"act_path": "lege/2009/287", "file": "art-0052-1", "number": "52^1", "last_change": None},
+        {"act_path": "lege/2009/287", "file": "art-0003", "number": "3^a", "last_change": None},
+        {"act_path": "lege/2012/1", "file": "art-0001", "number": "1", "last_change": None},
+    ]
+
+    def test_entries_follow_the_old_query_order(self):
+        entries = sitemap_entries(self.ACTS, self.ARTICLES)
+        self.assertEqual(entries[:6], [[path, None] for path in SITEMAP_FIXED_PAGES])
+        self.assertEqual(entries[6:], [
+            ["/codul-civil", "2023-07-09"],
+            ["/codul-civil/art-1", "2023-07-09"],
+            ["/codul-civil/art-2", "2020-01-01"],
+            ["/codul-civil/art-0003", None],
+            ["/codul-civil/art-52-1", None],
+            ["/codul-procedura", None],
+            ["/lege/2012/1", None],
+            ["/lege/2012/1/art-1", None],
+        ])
+
+    def test_objects_carry_an_index_and_pages_of_at_most_the_size(self):
+        with patch("build.textdelege.objects.SITEMAP_SIZE", 5):
+            objects = dict(sitemap_objects(self.ACTS, self.ARTICLES))
+        total = len(SITEMAP_FIXED_PAGES) + len(self.ACTS) + len(self.ARTICLES)
+        self.assertEqual(objects["sitemaps/index.json"], {"schema": "textdelege/sitemap-index/1", "pages": 3, "total": total})
+        self.assertEqual(sorted(objects), ["sitemaps/1.json", "sitemaps/2.json", "sitemaps/3.json", "sitemaps/index.json"])
+        self.assertEqual({len(objects[f"sitemaps/{n}.json"]["entries"]) for n in (1, 2)}, {5})
+        self.assertEqual(objects["sitemaps/1.json"]["schema"], "textdelege/sitemap/1")
+        self.assertEqual(sum(len(objects[f"sitemaps/{n}.json"]["entries"]) for n in (1, 2, 3)), total)
+
+    def test_article_slug(self):
+        self.assertEqual(article_slug("1112", "art-1112"), "art-1112")
+        self.assertEqual(article_slug("220^4", "art-0220-4"), "art-220-4")
+        self.assertEqual(article_slug("5^a", "art-0005-a"), "art-0005-a")
+

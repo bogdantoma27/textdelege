@@ -1,6 +1,8 @@
 import type { MiddlewareHandler } from "hono";
 import { PRE_PAINT, SCRIPTED_SPECULATION_RULES, SPECULATION_RULES } from "../views/layout";
 import { today } from "./dates";
+import { canonicalQuery } from "./query-params";
+import { LIMITED, RETRY_AFTER, SITE_KEY, TOO_MANY, isHeavy, overLimit } from "./rate-limit";
 import type { AppEnv } from "./store";
 
 async function sha256(text: string): Promise<string> {
@@ -47,6 +49,7 @@ export const securityHeaders: MiddlewareHandler<AppEnv> = async (c, next) => {
 const UNCACHED = new Set(["/healthz"]);
 
 const CACHE_CONTROL = "public, max-age=300, s-maxage=604800";
+export const NOT_FOUND_CACHE_CONTROL = "public, max-age=300, s-maxage=300";
 
 export const pageCache: MiddlewareHandler<AppEnv> = async (c, next) => {
   const url = new URL(c.req.url);
@@ -58,19 +61,32 @@ export const pageCache: MiddlewareHandler<AppEnv> = async (c, next) => {
     return next();
   }
   const version = c.env.CF_VERSION_METADATA?.id ?? "";
-  const key = new Request(`${url.origin}/_cache/${build}/${version}/${today()}${url.pathname}${url.search}`);
+  const key = new Request(`${url.origin}/_cache/${build}/${version}/${today()}${url.pathname}${canonicalQuery(url.searchParams)}`);
   const cache = caches.default;
-  const fresh = /\bno-cache\b/.test(c.req.header("Cache-Control") ?? "");
-  const stored = fresh ? undefined : await cache.match(key);
+  const stored = await cache.match(key);
   if (stored !== undefined) {
     const hit = new Response(stored.body, stored);
     hit.headers.set("Cache-Status", "textdelege; hit");
     return hit;
   }
+  // Only a miss does work, so only a miss is counted against the client.
+  const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+  const refuse = (status: number, body: string) =>
+    new Response(body, {
+      status,
+      headers: { "Content-Type": "text/html; charset=utf-8", "Retry-After": RETRY_AFTER, "Cache-Control": "no-store" },
+    });
+  if (await overLimit(c.env.MISS_LIMITER, ip)) return refuse(429, TOO_MANY);
+  if (isHeavy(url.pathname, url.search)) {
+    // Kill switch: HEAVY_ROUTES = "off" in wrangler.toml [vars] refuses every heavy miss before any work.
+    if (c.env.HEAVY_ROUTES === "off") return refuse(503, LIMITED);
+    if (await overLimit(c.env.HEAVY_LIMITER, ip)) return refuse(429, TOO_MANY);
+    if (await overLimit(c.env.SITE_HEAVY_LIMITER, SITE_KEY, true)) return refuse(503, LIMITED);
+  }
   await next();
-  if (c.res.status !== 200) return;
+  if (c.res.status !== 200 && c.res.status !== 404) return;
   const response = new Response(c.res.body, c.res);
-  response.headers.set("Cache-Control", CACHE_CONTROL);
+  response.headers.set("Cache-Control", c.res.status === 404 ? NOT_FOUND_CACHE_CONTROL : CACHE_CONTROL);
   c.executionCtx.waitUntil(cache.put(key, response.clone()));
   response.headers.set("Cache-Status", "textdelege; fwd=miss; stored");
   c.res = response;

@@ -3,20 +3,29 @@ import { exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { today } from "../src/lib/dates";
 import app from "../src/index";
-import { createStore } from "../src/lib/store";
+import { createStore, resetStoreCache } from "../src/lib/store";
 import { PRE_PAINT, SCRIPTED_SPECULATION_RULES, SPECULATION_RULES } from "../src/views/layout";
 import { seedObjects } from "./seed";
 import { replaceObject } from "./support";
 
-const get = (path: string, origin = "https://example.com") => exports.default.fetch(`${origin}${path}`, { redirect: "manual" });
+// The page is stored from a copy of the body, so read it before asking again.
+async function get(path: string, origin = "https://example.com"): Promise<Response> {
+  const response = await exports.default.fetch(`${origin}${path}`, { redirect: "manual" });
+  return new Response(await response.arrayBuffer(), response);
+}
 
 async function hash(text: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return btoa(String.fromCharCode(...new Uint8Array(digest)));
 }
 
+/** The page is stored by waitUntil after the response, so give the store a moment before calling it a miss. */
 async function again(path: string): Promise<Response> {
-  const response = await get(path);
+  let response = await get(path);
+  for (let attempt = 0; attempt < 20 && response.headers.get("Cache-Status") !== "textdelege; hit"; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    response = await get(path);
+  }
   expect(response.headers.get("Cache-Status")).toBe("textdelege; hit");
   return response;
 }
@@ -37,10 +46,33 @@ describe("the store of a request", () => {
       },
     });
     const context = { waitUntil: () => {}, passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
-    const response = await app.fetch(new Request("https://example.com/codul-civil/art-1?once=1"), { ...env, DATA: data }, context);
+    const response = await app.fetch(new Request("https://example.com/codul-civil/art-1?cuprins=unica"), { ...env, DATA: data }, context);
     expect(response.status).toBe(200);
     expect(await response.text()).toContain("<h1");
     expect(manifestReads).toBe(1);
+  });
+
+  it("keeps the manifest for a minute across requests of the same isolate", async () => {
+    let manifestReads = 0;
+    const data = new Proxy(env.DATA, {
+      get(target, property) {
+        const member = Reflect.get(target, property, target);
+        if (property !== "get") return typeof member === "function" ? member.bind(target) : member;
+        return (key: string, ...rest: unknown[]) => {
+          if (key === "manifest.json") manifestReads++;
+          return (member as (...args: unknown[]) => unknown).call(target, key, ...rest);
+        };
+      },
+    });
+    const context = { waitUntil: () => {}, passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
+    for (const path of ["/despre", "/legenda", "/despre"]) {
+      const response = await app.fetch(new Request(`https://example.com${path}?cuprins=manifest`), { ...env, DATA: data }, context);
+      expect(response.status).toBe(200);
+    }
+    expect(manifestReads).toBe(1);
+    resetStoreCache();
+    await app.fetch(new Request("https://example.com/legenda?cuprins=manifest2"), { ...env, DATA: data }, context);
+    expect(manifestReads).toBe(2);
   });
 });
 
@@ -109,13 +141,35 @@ describe("page cache", () => {
     }
   });
 
-  it("answers a request with Cache-Control: no-cache afresh and replaces the stored copy", async () => {
-    const path = "/codul-civil";
+  it("ignores a Cache-Control: no-cache request header", async () => {
+    const path = "/codul-civil/art-1/2014-10-18";
     await get(path);
     await again(path);
-    const fresh = await exports.default.fetch(`https://example.com${path}`, { headers: { "Cache-Control": "no-cache" } });
-    expect(fresh.headers.get("Cache-Status")).toBe("textdelege; fwd=miss; stored");
+    const forced = await exports.default.fetch(`https://example.com${path}`, { headers: { "Cache-Control": "no-cache" } });
+    expect(forced.headers.get("Cache-Status")).toBe("textdelege; hit");
+  });
+
+  it("gives every address with unknown parameters the entry of the bare address", async () => {
+    const path = "/codul-civil/art-1/2015-02-02";
+    expect((await get(path)).headers.get("Cache-Status")).toBe("textdelege; fwd=miss; stored");
     await again(path);
+    for (const variant of [`${path}?x=123`, `${path}?utm_source=a&fbclid=b`, `${path}?cuprins=`, `${path}?atribuire=&zz=1`]) {
+      expect((await get(variant)).headers.get("Cache-Status"), variant).toBe("textdelege; hit");
+    }
+    // A parameter the page reads is part of the key, whatever its position.
+    expect((await get(`${path}?ultima=1&atribuire=0`)).headers.get("Cache-Status")).toBe("textdelege; fwd=miss; stored");
+    expect((await get(`${path}?atribuire=0&ultima=1&x=1`)).headers.get("Cache-Status")).toBe("textdelege; hit");
+  });
+
+  it("stores a 404 for five minutes under the same key rules", async () => {
+    const first = await get("/nu-exista-nicaieri");
+    expect(first.status).toBe(404);
+    expect(first.headers.get("Cache-Status")).toBe("textdelege; fwd=miss; stored");
+    expect(first.headers.get("Cache-Control")).toBe("public, max-age=300, s-maxage=300");
+    const second = await get("/nu-exista-nicaieri?x=1");
+    expect(second.status).toBe(404);
+    expect(second.headers.get("Cache-Status")).toBe("textdelege; hit");
+    expect((await get("/sitemap-999.xml")).headers.get("Cache-Control")).toBe("public, max-age=300, s-maxage=300");
   });
 
   it("stores a search page like any other, and does not store its redirects", async () => {
@@ -138,15 +192,23 @@ describe("page cache", () => {
     expect((await get("/")).headers.get("Cache-Status")).toBe("textdelege; hit");
   });
 
-  it("keeps the health check out of the cache, and errors too", async () => {
-    for (const path of ["/healthz", "/nu-exista"]) {
-      const response = await get(path);
-      expect(response.headers.get("Cache-Status")).toBeNull();
-      expect(response.headers.get("Cache-Control")).toBeNull();
-    }
-    const twice = await get("/nu-exista");
-    expect(twice.status).toBe(404);
-    expect(twice.headers.get("Cache-Status")).toBeNull();
+  it("keeps the health check and server errors out of the cache", async () => {
+    const response = await get("/healthz");
+    expect(response.headers.get("Cache-Status")).toBeNull();
+    expect(response.headers.get("Cache-Control")).toBeNull();
+    const broken = new Proxy(env.DB, {
+      get(target, property) {
+        if (property !== "prepare") return Reflect.get(target, property, target);
+        return () => {
+          throw new Error("D1_ERROR: broken");
+        };
+      },
+    });
+    const context = { waitUntil: () => {}, passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
+    const failed = await app.fetch(new Request("https://example.com/cauta?q=eroare-dbx"), { ...env, DB: broken }, context);
+    expect(failed.status).toBe(503);
+    expect(failed.headers.get("Cache-Status")).toBeNull();
+    expect((await get("/cauta?q=eroare-dbx")).headers.get("Cache-Status")).toBe("textdelege; fwd=miss; stored");
   });
 
   it("does not store redirects", async () => {

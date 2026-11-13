@@ -29,6 +29,10 @@ class D1QuotaExceeded(D1Error):
     ...
 
 
+class D1BudgetExceeded(D1QuotaExceeded):
+    """The build's own cap on rows read or written in one run was passed."""
+
+
 QUOTA_MESSAGE = re.compile(r"limit|quota|exceeded", re.IGNORECASE)
 
 
@@ -54,11 +58,17 @@ class D1Client:
         *,
         opener=urllib.request.urlopen,
         sleep=time.sleep,
+        max_rows_read: int | None = None,
+        max_rows_written: int | None = None,
     ):
         self._url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/{database_id}/query"
         self._token = api_token
         self._opener = opener
         self._sleep = sleep
+        self._max_rows_read = max_rows_read
+        self._max_rows_written = max_rows_written
+        self.rows_read = 0
+        self.rows_written = 0
 
     def query(self, sql: str, params: list | None = None) -> list[dict]:
         request = urllib.request.Request(
@@ -84,6 +94,19 @@ class D1Client:
         if not payload.get("success"):
             raise _failure(f"D1 query failed: {payload.get('errors')}")
         results = payload.get("result") or []
+        for result in results:
+            meta = result.get("meta") or {}
+            self.rows_read += int(meta.get("rows_read") or 0)
+            self.rows_written += int(meta.get("rows_written") or 0)
+        for name, used, cap in (
+            ("read", self.rows_read, self._max_rows_read),
+            ("written", self.rows_written, self._max_rows_written),
+        ):
+            if cap is not None and used > cap:
+                raise D1BudgetExceeded(
+                    f"D1 budget for this run passed: {used:,} rows {name}, cap {cap:,}. "
+                    "Nothing more was sent; raise the cap in config.toml only after finding the cause."
+                )
         if not results:
             return []
         if not results[0].get("success", True):

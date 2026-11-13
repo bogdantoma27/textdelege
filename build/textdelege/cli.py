@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 from . import extractcache, historyindex, structure as structure_module
 from .acts import ActMeta, old_folder_for, select_acts
 from .config import Config, load_config
-from .d1 import SCHEMA_VERSION, D1Client, D1Error, D1QuotaExceeded
+from .d1 import D1BudgetExceeded, SCHEMA_VERSION, D1Client, D1Error, D1QuotaExceeded
 from .events import events_for
 from .extract import Article, extract_core, finalize_act, version_on
 from .freshness import INDEX, load_freshness, load_freshness_summary, shard_files
@@ -33,6 +33,7 @@ from .objects import (
     law_object,
     act_index_object,
     manifest_object,
+    sitemap_objects,
     object_key,
     ruling_object,
 )
@@ -68,6 +69,7 @@ NOOP_KEYS = ("source_head", "fingerprint", "today", "selection", "source_url")
 REWRITTEN = "history rewritten: full rebuild"
 NO_CHANGES = "no changes"
 QUOTA_NOTE = "D1 daily write limit reached; the next run continues from the checkpoint"
+BUDGET_NOTE = "stopped by the build's own D1 row cap; published data is unchanged past the last checkpoint"
 RECLONED_URL = "source URL changed: fresh clone"
 RECLONED_BROKEN = "cached clone could not be fetched: fresh clone"
 BUCHAREST = ZoneInfo("Europe/Bucharest")
@@ -151,7 +153,11 @@ def clients(config: Config, r2, d1, dry_run: bool) -> tuple:
     if d1 is None:
         if config.d1 is None:
             raise PipelineError("D1 credentials are not configured (set the variables named in [d1])")
-        d1 = D1Client(**asdict(config.d1))
+        d1 = D1Client(
+            **asdict(config.d1),
+            max_rows_read=config.d1_max_rows_read,
+            max_rows_written=config.d1_max_rows_written,
+        )
     return r2, d1
 
 
@@ -450,6 +456,7 @@ def build_outputs(
         data.metas, stats, freshness, load_freshness_summary(repo),
         json.loads(status_text) if status_text else {},
     )
+    objects.extend(sitemap_objects(rows.acts, rows.articles))
     return objects, rows, manifest, counts
 
 
@@ -633,6 +640,8 @@ def cmd_build(args, *, today, now, oracle, r2, d1, fetch=None) -> int:
             )),
             ("Duration", f"{time.monotonic() - started:.1f} s"),
         ]
+        if d1 is not None and hasattr(d1, "rows_read"):
+            fields.append(("D1 rows", f"{d1.rows_read:,} read, {d1.rows_written:,} written"))
         extra = extra or (
             "verification failed: nothing published" if failed else ("dry run" if args.dry_run else None)
         )
@@ -648,6 +657,10 @@ def cmd_build(args, *, today, now, oracle, r2, d1, fetch=None) -> int:
     else:
         try:
             build_id = publish(objects, rows, manifest, new_state, r2, d1)
+        except D1BudgetExceeded as error:
+            print(f"error: {error}", file=sys.stderr)
+            finish(True, state.get("build", "") if state else "", BUDGET_NOTE)
+            return 1
         except D1QuotaExceeded as error:
             print(f"error: {error}", file=sys.stderr)
             finish(True, state.get("build", "") if state else "", QUOTA_NOTE)

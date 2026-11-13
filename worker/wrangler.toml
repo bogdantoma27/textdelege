@@ -20,6 +20,31 @@ binding = "ASSETS"
 binding = "DATA"
 bucket_name = "textdelege-data"
 
+# Rate limits on cache misses only (src/lib/http.ts). namespace_id values are account-wide: 7341 and
+# 7342 belong to api-injuraturi, so these use 7351, 7352 and 7353.
+[[ratelimits]]
+name = "MISS_LIMITER"
+namespace_id = "7351"
+simple = { limit = 120, period = 60 }
+
+[[ratelimits]]
+name = "HEAVY_LIMITER"
+namespace_id = "7352"
+simple = { limit = 20, period = 60 }
+
+# One bucket for all clients together: bounds a flood that comes from many addresses (key "all").
+[[ratelimits]]
+name = "SITE_HEAVY_LIMITER"
+namespace_id = "7353"
+simple = { limit = 120, period = 60 }
+
+# Kill switch for the expensive routes (search, comparisons, dated forms, list filters, sitemaps).
+# "on" = normal. "off" = every cache MISS on those routes answers 503 at once, without reading R2 or D1;
+# cache hits and ordinary pages are unaffected. Flip it in the Cloudflare dashboard (Workers > textdelege >
+# Settings > Variables) or here and redeploy.
+[vars]
+HEAVY_ROUTES = "on"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "textdelege"

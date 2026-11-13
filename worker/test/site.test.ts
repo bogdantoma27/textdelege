@@ -1,6 +1,9 @@
+import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import app from "../src/index";
 import { SITEMAP_SIZE } from "../src/routes/site";
+import { removeObject, replaceObject } from "./support";
 
 const get = (path: string) => exports.default.fetch(`https://example.com${path}`, { redirect: "manual" });
 const locs = (xml: string) => [...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
@@ -71,3 +74,59 @@ describe("sitemaps", () => {
     await first.text();
   });
 });
+
+describe("sitemaps from the build", () => {
+  const withoutDatabase = async (path: string) => {
+    const broken = new Proxy(env.DB, {
+      get(target, property) {
+        if (property !== "prepare") return Reflect.get(target, property, target);
+        return () => {
+          throw new Error("D1_ERROR: the sitemap must not touch D1");
+        };
+      },
+    });
+    const context = { waitUntil: () => {}, passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
+    return app.fetch(new Request(`https://example.com${path}`), { ...env, DB: broken }, context);
+  };
+
+  it("serves the index and the children from the R2 objects, without D1", async () => {
+    const index = await withoutDatabase("/sitemap.xml");
+    expect(index.status).toBe(200);
+    expect(locs(await index.text())).toEqual(["https://textdelege.ro/sitemap-1.xml"]);
+    const child = await withoutDatabase("/sitemap-1.xml");
+    expect(child.status).toBe(200);
+    const xml = await child.text();
+    expect(locs(xml)).toHaveLength(11);
+    expect(xml).toContain("<url><loc>https://textdelege.ro/codul-civil/art-1</loc><lastmod>2023-07-09</lastmod></url>");
+  });
+
+  it("checks the number of a child against the index without running a query", async () => {
+    const restore = await replaceObject("sitemaps/index.json", { schema: "textdelege/sitemap-index/1", pages: 2, total: 60000 });
+    try {
+      expect(locs(await (await withoutDatabase("/sitemap.xml")).text())).toEqual([
+        "https://textdelege.ro/sitemap-1.xml",
+        "https://textdelege.ro/sitemap-2.xml",
+      ]);
+      expect((await withoutDatabase("/sitemap-3.xml")).status).toBe(404);
+      expect((await withoutDatabase("/sitemap-999.xml")).status).toBe(404);
+      // page 2 is listed but missing from R2
+      expect((await withoutDatabase("/sitemap-2.xml")).status).toBe(404);
+    } finally {
+      await restore();
+    }
+  });
+
+  it("falls back to the D1 query while the published data has no sitemap objects", async () => {
+    const before = await (await get("/sitemap-1.xml")).text();
+    const restore = await removeObject("sitemaps/index.json");
+    try {
+      expect(locs(await (await get("/sitemap.xml")).text())).toEqual(["https://textdelege.ro/sitemap-1.xml"]);
+      const legacy = await (await get("/sitemap-1.xml")).text();
+      expect(legacy).toBe(before);
+      expect((await get("/sitemap-2.xml")).status).toBe(404);
+    } finally {
+      await restore();
+    }
+  });
+});
+
