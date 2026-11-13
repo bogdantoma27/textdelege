@@ -30,7 +30,7 @@ actsRoutes.get("/acte", async (c) => {
   };
   const store = c.get("store");
   const list = query.yearInvalid
-    ? { items: [], total: 0, over: false, page: 1, pages: 1 }
-    : await store.listActs(filter).catch(async () => listFromIndex(await store.actIndex(), filter));
+    ? { items: [], total: 0, page: 1, pages: 1 }
+    : listFromIndex(await store.actIndex(), filter);
   return c.html(renderActs(query, list), query.yearInvalid ? 400 : 200);
 });

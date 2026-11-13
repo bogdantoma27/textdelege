@@ -1,5 +1,4 @@
 import type { MiddlewareHandler } from "hono";
-import { normalise } from "./citation";
 import type {
   ActIndex,
   ActIndexEntry,
@@ -41,7 +40,6 @@ export interface Store {
   legacySitemapEntries(limit: number, offset: number): Promise<SitemapEntry[]>;
   resolveAlias(alias: string): Promise<string | null>;
   actRulings(path: string): Promise<ArticleRuling[]>;
-  listActs(filter: ActFilter): Promise<ActList>;
 }
 
 export interface ActFilter {
@@ -67,30 +65,11 @@ export interface ActListItem {
 export interface ActList {
   items: ActListItem[];
   total: number;
-  over: boolean;
   page: number;
   pages: number;
 }
 
 export const ACTS_PAGE = 50;
-
-const FOLDED_LETTERS: [string, string][] = [
-  ["ăĂ", "a"],
-  ["âÂ", "a"],
-  ["îÎ", "i"],
-  ["șȘşŞ", "s"],
-  ["țȚţŢ", "t"],
-];
-
-function folded(column: string): string {
-  let expression = `lower(${column})`;
-  for (const [letters, plain] of FOLDED_LETTERS) {
-    for (const letter of letters) expression = `replace(${expression}, '${letter}', '${plain}')`;
-  }
-  return expression;
-}
-
-const FOLDED_NAME = `(${folded("coalesce(title, '')")} || ' ' || ${folded("coalesce(short, '')")})`;
 
 export const PREFIX_MIN = 4;
 export const COUNT_CAP = 1000;
@@ -363,51 +342,6 @@ export function createStore(env: Env): Store {
         date: row.date,
         outcome: row.outcome,
       }));
-    },
-
-    async listActs(filter) {
-      const where: string[] = [];
-      const values: (string | number)[] = [];
-      if (filter.kind !== undefined) {
-        where.push("kind = ?");
-        values.push(filter.kind);
-      }
-      if (filter.year !== undefined) {
-        where.push("year = ?");
-        values.push(filter.year);
-      }
-      if (filter.status === "in-force") where.push("status = 'in force'");
-      if (filter.status === "repealed") where.push("status LIKE 'repealed%'");
-      const q = normalise(filter.q ?? "");
-      if (q !== "") {
-        const like = `%${q.replace(/[!%_]/g, "!$&")}%`;
-        if (/^[0-9]+$/.test(q)) {
-          where.push(`(number = ? OR ${FOLDED_NAME} LIKE ? ESCAPE '!')`);
-          values.push(q, like);
-        } else {
-          where.push(`${FOLDED_NAME} LIKE ? ESCAPE '!'`);
-          values.push(like);
-        }
-      }
-      const clause = where.length === 0 ? "" : `WHERE ${where.join(" AND ")}`;
-      const row = await env.DB.prepare(
-        `SELECT COUNT(*) AS total FROM (SELECT 1 FROM acts ${clause} LIMIT ${COUNT_CAP + 1})`,
-      )
-        .bind(...values)
-        .first<{ total: number }>();
-      const counted = row?.total ?? 0;
-      const total = Math.min(counted, COUNT_CAP);
-      const pages = Math.max(1, Math.ceil(total / ACTS_PAGE));
-      const page = Math.min(Math.max(1, Math.floor(filter.page)), pages);
-      const { results } = await env.DB.prepare(
-        `SELECT path, alias, kind, title, short, status, year, number, articles
-           FROM acts ${clause}
-          ORDER BY year DESC, CAST(number AS INTEGER) DESC, path
-          LIMIT ${ACTS_PAGE} OFFSET ?${values.length + 1}`,
-      )
-        .bind(...values, (page - 1) * ACTS_PAGE)
-        .all<ActListItem>();
-      return { items: results, total, over: counted > COUNT_CAP, page, pages };
     },
 
     async resolveAlias(alias) {

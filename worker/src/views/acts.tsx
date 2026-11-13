@@ -156,11 +156,11 @@ export function renderActs(query: ActsQuery, list: ActList) {
           <section aria-label={t("actsListLabel")}>
             <div class="results-bar">
               <span class="count">
-                {list.over ? t("actsCountOver") : tPlural(list.total, COUNTS, { n: grouped(list.total) })}
+                {tPlural(list.total, COUNTS, { n: grouped(list.total) })}
               </span>
               {list.pages > 1 && (
                 <span class="count">
-                  {t(list.over ? "actsRangeOver" : "actsRange", {
+                  {t("actsRange", {
                     first: grouped(first),
                     last: grouped(last),
                     total: grouped(list.total),
