@@ -5,7 +5,11 @@ from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 
-from build.textdelege.structure import article_number, load, parse_structure
+import contextlib
+import gzip
+import io
+
+from build.textdelege.structure import Breaker, article_number, load, parse_structure, remote_key
 
 # Snippets are cut from the official portal pages (event attributes and article bodies
 # shortened): the Civil Code (legea 287/2009), the Fiscal Code (legea 227/2015) and legea 53/2003.
@@ -221,6 +225,157 @@ class LoadTest(unittest.TestCase):
         file.parent.mkdir(parents=True)
         file.write_text("not json", encoding="utf-8")
         self.assertIsNotNone(load(META, date(2023, 7, 9), Path(self.dir.name), self.fetch))
+
+
+class FakeR2:
+    def __init__(self, broken=False):
+        self.objects: dict[str, bytes] = {}
+        self.puts: list[str] = []
+        self.broken = broken
+
+    def get(self, key):
+        if self.broken:
+            raise OSError("r2 down")
+        return self.objects.get(key)
+
+    def put(self, key, body, content_type, content_encoding=None):
+        if self.broken:
+            raise OSError("r2 down")
+        self.puts.append(key)
+        self.objects[key] = body
+
+
+def entry(latest: str, label: str = "Cartea veche") -> dict:
+    structure = {"headings": [{"kind": "crt", "label": label, "name": "", "depth": 0}], "articles": {"1": 0}}
+    return {"url": META.portal, "latest": latest, "structure": structure}
+
+
+def gz(data: dict) -> bytes:
+    return gzip.compress(json.dumps(data).encode("utf-8"))
+
+
+def failing(url):
+    raise OSError("Remote end closed connection without response")
+
+
+class RemoteCacheTest(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.cache = Path(self.dir.name)
+        self.key = remote_key(META.path)
+        self.calls: list[str] = []
+
+    def fetch(self, url):
+        self.calls.append(url)
+        return CIVIL.encode("utf-8")
+
+    def write_local(self, data):
+        file = self.cache / "structure" / "lege_2009_287.json"
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text(json.dumps(data), encoding="utf-8")
+
+    def quiet(self, *args, **kwargs):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            result = load(*args, **kwargs)
+        return result, err.getvalue()
+
+    def test_the_remote_key_format(self):
+        self.assertEqual(self.key, "build-cache/structure/lege_2009_287.json.gz")
+
+    def test_a_remote_hit_avoids_fetching_and_is_kept_locally(self):
+        r2 = FakeR2()
+        r2.objects[self.key] = gz(entry("2023-07-09"))
+        result = load(META, date(2023, 7, 9), self.cache, self.fetch, r2=r2)
+        self.assertEqual(result["headings"][0]["label"], "Cartea veche")
+        self.assertEqual(self.calls, [])
+        self.assertTrue((self.cache / "structure" / "lege_2009_287.json").exists())
+        self.assertEqual(r2.puts, [])
+        load(META, date(2023, 7, 9), self.cache, self.fetch, r2=r2)
+        self.assertEqual(r2.puts, [])
+
+    def test_a_fetch_is_stored_locally_and_remotely_once(self):
+        r2 = FakeR2()
+        load(META, date(2023, 7, 9), self.cache, self.fetch, r2=r2)
+        self.assertEqual(r2.puts, [self.key])
+        stored = json.loads(gzip.decompress(r2.objects[self.key]))
+        self.assertEqual((stored["url"], stored["latest"]), (META.portal, "2023-07-09"))
+        load(META, date(2023, 7, 9), self.cache, self.fetch, r2=r2)
+        self.assertEqual((len(self.calls), len(r2.puts)), (1, 1))
+
+    def test_a_local_hit_seeds_the_remote_once(self):
+        self.write_local(entry("2023-07-09"))
+        r2 = FakeR2()
+        load(META, date(2023, 7, 9), self.cache, self.fetch, r2=r2)
+        load(META, date(2023, 7, 9), self.cache, self.fetch, r2=r2)
+        self.assertEqual((r2.puts, self.calls), ([self.key], []))
+        # a new R2 (or changed content) is seeded again
+        self.write_local(entry("2023-07-09", "Alta"))
+        load(META, date(2023, 7, 9), self.cache, self.fetch, r2=r2)
+        self.assertEqual(len(r2.puts), 2)
+
+    def test_a_failed_fetch_keeps_a_stale_local_entry(self):
+        self.write_local(entry("2020-01-01"))
+        result, err = self.quiet(META, date(2023, 7, 9), self.cache, failing)
+        self.assertEqual(result["headings"][0]["label"], "Cartea veche")
+        self.assertIn("headings: lege/2009/287: Remote end closed connection without response; keeping the cached headings from 2020-01-01", err)
+
+    def test_a_failed_fetch_keeps_a_stale_remote_entry(self):
+        r2 = FakeR2()
+        r2.objects[self.key] = gz(entry("2020-01-01"))
+        result, err = self.quiet(META, date(2023, 7, 9), self.cache, failing, r2=r2)
+        self.assertEqual(result["headings"][0]["label"], "Cartea veche")
+        self.assertIn("keeping the cached headings from 2020-01-01", err)
+
+    def test_a_failure_with_nothing_cached_gives_none(self):
+        result, err = self.quiet(META, date(2023, 7, 9), self.cache, failing, r2=FakeR2())
+        self.assertIsNone(result)
+        self.assertNotIn("keeping", err)
+
+    def test_the_breaker_stops_fetching_after_three_failures_and_a_success_resets_it(self):
+        breaker = Breaker()
+        calls = []
+
+        def broken(url):
+            calls.append(url)
+            raise OSError("down")
+
+        def meta(n):
+            return SimpleNamespace(path=f"lege/2000/{n}", portal=f"https://example.invalid/{n}")
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            for n in range(1, 3):
+                load(meta(n), "2023-07-09", self.cache, broken, breaker=breaker)
+            load(meta(3), "2023-07-09", self.cache, self.fetch, breaker=breaker)  # success resets
+            self.assertEqual(breaker.failures, 0)
+            for n in range(4, 10):
+                load(meta(n), "2023-07-09", self.cache, broken, breaker=breaker)
+        self.assertEqual(len(calls), 5)  # 2 failures, then 3 more after the reset
+        self.assertTrue(breaker.stopped)
+        self.assertEqual((breaker.kept, breaker.none), (0, 8))
+        self.assertEqual(
+            breaker.summary(),
+            "headings: fetching stopped after 3 failures in a row; 0 acts kept cached headings, 8 acts have none",
+        )
+
+    def test_a_stopped_breaker_still_serves_cached_headings_without_fetching(self):
+        breaker = Breaker()
+        breaker.stopped = True
+        self.write_local(entry("2020-01-01"))
+        result, err = self.quiet(META, date(2023, 7, 9), self.cache, self.fetch, breaker=breaker)
+        self.assertIsNotNone(result)
+        self.assertEqual((self.calls, breaker.kept, err), ([], 1, ""))
+        self.assertIsNone(Breaker().summary())
+
+    def test_remote_errors_never_raise(self):
+        r2 = FakeR2(broken=True)
+        result, err = self.quiet(META, date(2023, 7, 9), self.cache, self.fetch, r2=r2)
+        self.assertIsNotNone(result)
+        self.assertIn("could not", err)
+        self.write_local(entry("2023-07-09"))
+        result, err = self.quiet(META, date(2023, 7, 9), self.cache, self.fetch, r2=r2)
+        self.assertIsNotNone(result)
 
 
 if __name__ == "__main__":

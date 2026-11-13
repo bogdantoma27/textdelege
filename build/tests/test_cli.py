@@ -241,6 +241,20 @@ class CliTest(unittest.TestCase):
         self.assertEqual(asked, ["https://example.invalid/287"])
         self.assertNotIn("headings", self.out("acts/lege/2010/134/act.json"))
 
+    def test_a_failing_portal_never_fails_the_build(self):
+        self.config.write_text(
+            self.config.read_text(encoding="utf-8") + "headings = true" + chr(10) + "headings_min_articles = 1" + chr(10),
+            encoding="utf-8",
+        )
+
+        def refuse(url):
+            raise OSError("Remote end closed connection without response")
+
+        code, _, stderr = self.build(fetch=refuse)
+        self.assertEqual(code, 0, stderr)
+        self.assertIn("headings: lege/2009/287: Remote end closed connection without response", stderr)
+        self.assertNotIn("headings", self.out("acts/lege/2009/287/act.json"))
+
     def test_dry_run_writes_objects_sql_and_state(self):
         code, stdout, stderr = self.build()
         self.assertEqual((code, stderr), (0, ""), stdout)

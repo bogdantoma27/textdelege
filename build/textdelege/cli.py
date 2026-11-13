@@ -604,15 +604,19 @@ def cmd_build(args, *, today, now, oracle, r2, d1, fetch=None) -> int:
     build_id = new_state["build"]
     events_started = time.monotonic()
     structure_of = None
+    breaker = structure_module.Breaker()
     if config.headings:
         def structure_of(meta: ActMeta, count: int) -> dict | None:
             if count < config.headings_min_articles:
                 return None
             return structure_module.load(
-                meta, meta.latest, config.cache_dir, fetch or structure_module.fetch_page
+                meta, meta.latest, config.cache_dir, fetch or structure_module.fetch_page,
+                r2=r2, breaker=breaker,
             )
 
     objects, rows, manifest, counts = build_outputs(repo, data, build_id, now, today, structure_of)
+    if breaker.summary():
+        print(breaker.summary(), file=sys.stderr)
     events_seconds = time.monotonic() - events_started
     publish_started = time.monotonic()
 
