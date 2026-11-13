@@ -3,7 +3,7 @@ import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it } from "vitest";
 import app from "../src/index";
 import { createStore } from "../src/lib/store";
-import type { ChangeItem, Manifest } from "../src/lib/types";
+import type { ActIndexEntry, ChangeItem, Manifest } from "../src/lib/types";
 import { removeObject, replaceObject } from "./support";
 
 const get = (path: string, init?: RequestInit) =>
@@ -27,6 +27,38 @@ async function patchSite(patch: (site: { items: ChangeItem[]; upcoming: ChangeIt
   patch(site!);
   restores.push(await replaceObject("changes/site.json", site));
 }
+
+async function patchIndex(patch: (acts: ActIndexEntry[]) => ActIndexEntry[]): Promise<void> {
+  const acts = patch(structuredClone(await createStore(env).actIndex()));
+  restores.push(await replaceObject("acts/index.json", { schema: "textdelege/act-index/1", acts }));
+}
+
+const entry = (path: string, kind: string, extra: Partial<ActIndexEntry> = {}): ActIndexEntry => ({
+  path,
+  alias: null,
+  title: `Act ${path}`,
+  short: null,
+  kind,
+  status: "in force",
+  from: "1990-01-01",
+  latest: "1990-01-01",
+  articles: 1,
+  ...extra,
+});
+
+const change = (n: number, extra: Partial<ChangeItem> = {}): ChangeItem => ({
+  date: "2026-03-05",
+  act_path: "oug/2026/41",
+  file: `art-${n}`,
+  number: String(n),
+  title: null,
+  verb: "entered",
+  units: [],
+  law: null,
+  ...extra,
+});
+
+const recent = (html: string) => html.slice(html.indexOf('id="recente"'), html.indexOf("Toate modificările"));
 
 describe("home", () => {
   it("moves the search from the masthead into the hero, with no examples, source line or stats strip", async () => {
@@ -121,9 +153,7 @@ describe("home", () => {
     expect(html).toContain('href="/codul-civil"');
     expect(html).toContain("Modificări recente");
     expect(html).toContain('href="/modificari"');
-    expect(html).toContain('href="/codul-civil/art-1/2023-07-09"');
     expect(html).toContain('href="/lege/2023/200"');
-    expect(html).toContain("alin. (1)");
     expect(html).toContain("Intră în vigoare în curând");
     expect(html).toContain("01.01.2099");
     expect(html).toContain('<link rel="canonical" href="https://textdelege.ro/"');
@@ -132,14 +162,14 @@ describe("home", () => {
 
   it("lists each code once", async () => {
     const html = await page("/");
-    const codes = html.slice(html.indexOf('id="coduri"'), html.indexOf('id="recente"'));
+    const codes = html.slice(html.indexOf('id="coduri"'), html.indexOf('id="populare-titlu"'));
     expect(codes.match(/href="\/codul-civil"/g)?.length).toBe(1);
     expect(html).not.toContain('class="toc');
   });
 
-  it("orders the bands: hero, numbers, codes, the date and the data, changes", async () => {
+  it("orders the bands: hero beside the changes, codes, popular laws, type counts, the date and what else can be done, facts", async () => {
     const html = await page("/");
-    const order = ['class="home-hero"', 'id="coduri"', 'id="la-data-titlu"', 'id="despre-date"', 'aria-labelledby="recente"'].map((s) => html.indexOf(s));
+    const order = ['class="home-hero"', 'aria-labelledby="recente"', 'id="coduri"', 'id="populare-titlu"', 'class="home-kinds"', 'id="la-data-titlu"', 'id="ce-poti-titlu"', 'class="home-facts"'].map((s) => html.indexOf(s));
     expect(order.every((i) => i > -1)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
@@ -148,7 +178,6 @@ describe("home", () => {
     const html = await page("/");
     const facts = /<p class="home-facts">([^<]*)<\/p>/.exec(html)?.[1];
     expect(facts).toBe("2 acte · 3 articole · 4 versiuni · 1 decizie · surse verificate la 01.11.2026");
-    expect(html.indexOf('aria-labelledby="recente"')).toBeLessThan(html.indexOf('class="home-facts"'));
     expect(html.indexOf('class="home-facts"')).toBeLessThan(html.indexOf("<footer"));
   });
 
@@ -185,7 +214,7 @@ describe("home", () => {
     });
     const html = await page("/");
     expect(html).not.toContain('class="fact"');
-    expect(html.slice(html.indexOf('id="coduri"'), html.indexOf('id="recente"'))).not.toContain("<span>");
+    expect(html.slice(html.indexOf('id="coduri"'), html.indexOf('id="populare-titlu"'))).not.toContain("<span>");
   });
 
   it("shows the date of the newest version of each act", async () => {
@@ -201,10 +230,9 @@ describe("home", () => {
   it("omits the upcoming section when nothing is scheduled", async () => {
     const html = await page("/");
     expect(html).not.toContain("Intră în vigoare în curând</h2>");
-    expect(html).not.toContain("home-changes split");
   });
 
-  it("lists upcoming changes beside the recent ones, not as a table", async () => {
+  it("lists upcoming changes under the recent ones, not as a table", async () => {
     await patchSite((site) => {
       site.upcoming = [
         {
@@ -220,21 +248,117 @@ describe("home", () => {
       ];
     });
     const html = await page("/");
-    const section = html.slice(html.indexOf('id="in-curand-titlu"'), html.indexOf("</footer>"));
-    expect(html).toContain('class="home-changes split"');
+    const section = html.slice(html.indexOf('id="in-curand-titlu"'), html.indexOf('id="coduri"'));
+    expect(html.indexOf('id="recente"')).toBeLessThan(html.indexOf('id="in-curand-titlu"'));
+    expect(html.indexOf('id="in-curand-titlu"')).toBeLessThan(html.indexOf('id="coduri"'));
     expect(section).toContain('<ul class="plain upcoming">');
     expect(section).not.toContain("<table");
     expect(section).toContain('<time class="upcoming-date" datetime="2099-01-01">01.01.2099</time>');
     expect(section).toContain('href="/codul-civil/art-2/2099-01-01"');
   });
 
-  it("shows ten recent changes at most", async () => {
+  it("shows six lines of recent changes at most, one per act and day", async () => {
     await patchSite((site) => {
-      site.items = Array.from({ length: 14 }, (_, i) => ({ ...site.items[0]!, number: String(i + 1) }));
+      site.items = Array.from({ length: 9 }, (_, i) => change(1, { date: `2026-03-0${i + 1}` }));
+    });
+    expect(recent(await page("/")).match(/<li>/g)).toHaveLength(6);
+  });
+
+  it("groups the articles of one act changed on one day into one line with the right plural", async () => {
+    await patchSite((site) => {
+      site.items = [
+        ...Array.from({ length: 12 }, (_, i) => change(i + 1)),
+        change(1, { date: "2026-03-01", verb: "modified", act_path: "lege/2009/287" }),
+        change(2, { date: "2026-03-01", verb: "modified", act_path: "lege/2009/287" }),
+        change(3, { date: "2026-03-01", verb: "modified", act_path: "lege/2009/287" }),
+        change(4, { date: "2026-02-01", verb: "repealed", act_path: "lege/2009/287" }),
+        ...Array.from({ length: 20 }, (_, i) => change(i + 1, { date: "2026-01-01", act_path: "lege/2009/287" })),
+      ];
+    });
+    const list = recent(await page("/"));
+    expect(list.match(/<li>/g)).toHaveLength(4);
+    expect(list).toContain('<time datetime="2026-03-05">05.03.2026</time><a href="/oug/2026/41">oug/2026/41</a> · 12 articole intrate în vigoare');
+    expect(list).toContain("3 articole modificate");
+    expect(list).toContain("1 articol abrogat");
+    expect(list).toContain("20 de articole intrate în vigoare");
+  });
+
+  it("starts a new line when the verb changes, and names the amending law only when it is not the act itself", async () => {
+    await patchSite((site) => {
+      const law = { key: "legea-200-2023", label: "Legea nr. 200/2023" };
+      site.items = [
+        change(1, { verb: "modified", law }),
+        change(2, { verb: "modified", law }),
+        change(3, { verb: "entered", law }),
+        change(4, { verb: "entered", act_path: "lege/2023/200", law }),
+        change(5, { verb: "modified", law: { key: "legea-1-2020", label: "Legea nr. 1/2020" } }),
+      ];
+    });
+    const lines = recent(await page("/")).match(/<li>.*?<\/li>/gs) ?? [];
+    expect(lines).toHaveLength(4);
+    expect(lines[0]).toContain('2 articole modificate prin <a href="/lege/2023/200">Legea nr. 200/2023</a>');
+    expect(lines[1]).toContain("1 articol intrat în vigoare prin");
+    expect(lines[2]).toContain("1 articol intrat în vigoare");
+    expect(lines[2]).not.toContain("prin");
+    expect(lines[3]).toContain('1 articol modificat prin <a href="/lege/2020/1">');
+  });
+
+  it("limits the upcoming list to four", async () => {
+    await patchSite((site) => {
+      site.upcoming = Array.from({ length: 7 }, (_, i) => change(i + 1, { date: "2099-01-01" }));
     });
     const html = await page("/");
-    const table = html.slice(html.indexOf('id="recente"'), html.indexOf("Toate modificările"));
-    expect(table.match(/<tr>/g)).toHaveLength(11);
+    const upcoming = html.slice(html.indexOf('id="in-curand-titlu"'), html.indexOf('id="coduri"'));
+    expect(upcoming.match(/<li>/g)).toHaveLength(4);
+  });
+
+  it("lists the popular laws that are in the act index and skips the others", async () => {
+    await patchIndex((acts) => [
+      ...acts,
+      entry("oug/2002/195", "oug"),
+      entry("lege/2014/85", "lege", { alias: "codul-insolventei" }),
+    ]);
+    const html = await page("/");
+    const popular = html.slice(html.indexOf('id="populare-titlu"'), html.indexOf('class="home-kinds"'));
+    expect(popular).toContain("Legi căutate des");
+    expect(popular).toContain('<a href="/oug/2002/195">Codul rutier</a>');
+    expect(popular).toContain('<a href="/codul-insolventei">Codul insolvenței</a>');
+    expect(popular).not.toContain("Legea sănătății");
+    expect(popular.match(/<li>/g)).toHaveLength(2);
+  });
+
+  it("counts the acts by type from the act index and links each count to the filtered list", async () => {
+    await patchIndex(() => [
+      entry("lege/1990/1", "lege"),
+      entry("lege/1990/2", "lege"),
+      entry("oug/2002/1", "oug"),
+      ...Array.from({ length: 1200 }, (_, i) => entry(`og/2000/${i + 1}`, "og")),
+      entry("hg/2000/1", "hg"),
+    ]);
+    const html = await page("/");
+    const line = /<p class="home-kinds"[^>]*>(.*?)<\/p>/s.exec(html)?.[1];
+    expect(line).toBe(
+      '<a href="/acte?tip=lege">Legi (2)</a> · <a href="/acte?tip=oug">OUG (1)</a> · <a href="/acte?tip=og">OG (1.200)</a> · ' +
+        '<a href="/acte?tip=decret-lege">Decrete-lege (0)</a> · <a href="/acte?tip=hotarare-parlament">Hotărâri ale Parlamentului (0)</a> · ' +
+        '<a href="/acte">Toate actele (1.204)</a>',
+    );
+  });
+
+  it("links an example of each thing the site can do beside the date form", async () => {
+    const html = await page("/");
+    const section = html.slice(html.indexOf('id="ce-poti-titlu"'), html.indexOf('class="home-facts"'));
+    expect(section).toContain("Ce mai poți face");
+    expect(section).toContain('href="/codul-muncii/art-41/2007-04-22"');
+    expect(section).toContain('href="/codul-muncii/art-41/compara/2007-04-22..2011-05-18"');
+    expect(section).toContain('href="/abonare"');
+    expect(html.indexOf('id="la-data-titlu"')).toBeLessThan(html.indexOf('id="ce-poti-titlu"'));
+  });
+
+  it("no longer carries the Despre date block", async () => {
+    const html = await page("/");
+    expect(html).not.toContain("Despre date");
+    expect(html).not.toContain("home-about");
+    expect(html).not.toContain("Citește mai mult");
   });
 
   it("shows a change without a linkable law as plain text", async () => {
@@ -336,16 +460,12 @@ describe("home", () => {
     expect(item.slice(0, item.indexOf("</li>"))).not.toContain("Nu mai este în vigoare");
   });
 
-  it("says what the site is and credits the source repository beside the date form", async () => {
+  it("says what the site is", async () => {
     const html = await page("/");
     const hero = html.slice(html.indexOf('class="home-hero"'), html.indexOf('id="coduri"'));
     expect(hero).toContain('<h1 id="home-titlu">Legile României, cu toate modificările lor.</h1>');
     expect(hero).toContain("Vezi ce spune un articol azi, ce spunea înainte și cine l-a schimbat.");
     expect(html).toContain("<title>Legile României, cu toate modificările lor. | Textdelege</title>");
-    const about = html.slice(html.indexOf('class="home-about"'), html.indexOf('class="home-changes'));
-    expect(about).toContain('<a href="https://github.com/lexifina/romania-law">lexifina/romania-law</a>');
-    expect(about).toContain('href="/despre"');
-    expect(html.indexOf('id="la-data-titlu"')).toBeLessThan(html.indexOf('id="despre-date"'));
   });
 
   it("puts the Constitution first", async () => {

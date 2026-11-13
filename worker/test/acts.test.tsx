@@ -279,12 +279,12 @@ describe("the acts page", () => {
 });
 
 describe("links to the acts page", () => {
-  it("is in the header, the footer and under the code list on the home page", async () => {
+  it("is in the header, the footer and in the act type line on the home page", async () => {
     const html = await page("/despre");
     expect(html).toContain('<a href="/acte" data-text="Acte">Acte</a>');
     expect(html).toContain('<li><a href="/acte">Acte</a></li>');
     const home = await page("/");
-    expect(home).toContain('<p><a href="/acte">Toate actele</a></p>');
+    expect(home).toMatch(/<a href="\/acte">Toate actele \([0-9.]+\)<\/a>/);
   });
 });
 

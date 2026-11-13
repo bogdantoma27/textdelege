@@ -9,5 +9,5 @@ export const homeRoutes = new Hono<AppEnv>();
 homeRoutes.get("/", async (c) => {
   const store = c.get("store");
   const [manifest, changes, index] = await Promise.all([store.manifest(), store.changes("site"), store.actIndex()]);
-  return c.html(renderHome({ now: today(), historical: c.req.query("coduri") === "istorice" }, manifest, changes, actNames(index)));
+  return c.html(renderHome({ now: today(), historical: c.req.query("coduri") === "istorice" }, manifest, changes, actNames(index), index));
 });

@@ -646,12 +646,12 @@ describe("styles.css", () => {
 
   it("builds the home page from the hero on the canvas with the numbers beside the title, the codes, the date row and the changes", () => {
     expect(css).not.toMatch(/^\.home-hero\{|\.home-hero>div|\.home-hero h1 em|\.home-strip|\.home \.examples|\.source-line/m);
-    expect(block(".home .solo>.home-hero")).toBe(".home .solo>.home-hero{margin-top:0");
+    expect(block(".home .solo>.home-top")).toBe(".home .solo>.home-top{margin-top:0");
     expect(block(".hero-search .field")).toContain("height:56px");
     expect(block(".home-facts")).toContain("color:var(--muted)");
     expect(block(".bare-header .header-bar")).toContain("grid-template-columns:minmax(max-content,1fr) auto");
     expect(block(".home-row")).toContain("grid-template-columns:minmax(0,1fr) minmax(0,1fr)");
-    expect(css).toContain("@media (min-width:1101px){.home-changes.split{grid-template-columns:minmax(0,2fr) minmax(0,1fr);column-gap:64px}}");
+    expect(css).toContain("@media (min-width:1101px){.home-top{grid-template-columns:minmax(0,3fr) minmax(0,2fr);column-gap:64px}}");
     expect(css).not.toContain(".stats");
   });
 

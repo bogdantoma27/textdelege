@@ -2,15 +2,71 @@ import { type Key, type PluralForm, t, tPlural } from "../text";
 import { formatRo } from "../lib/dates";
 import { actName, isCurrent, ordered } from "../lib/act-order";
 import { parseActStatus } from "../lib/status";
-import type { ChangeItem, ChangesObject, Manifest, ManifestAct } from "../lib/types";
-import { SOURCE_REPOSITORY, actUrl } from "../lib/urls";
-import { type ActNames, actOf, changeAction, changeArticle, changeCells, changesHead } from "./changes";
-import { DataTable, DateField, DateHint, Tabs } from "./components";
+import type { ActIndexEntry, ChangeItem, ChangesObject, EventVerb, Manifest, ManifestAct } from "../lib/types";
+import { actUrl, lawKeyFromActRef, subscribeUrl } from "../lib/urls";
+import { type ActNames, actOf, changeAction, changeArticle } from "./changes";
+import { DateField, DateHint, Tabs } from "./components";
 import { Layout, ORIGIN, SearchForm } from "./layout";
-import { StatusBadge, grouped } from "./shared";
+import { LawLink, StatusBadge, grouped } from "./shared";
 
-const RECENT = 10;
-const UPCOMING = 10;
+const RECENT = 6;
+const UPCOMING = 4;
+
+/** Laws people look for by a name the act itself does not carry. Entries missing from the act index are skipped. */
+export const POPULAR: { path: string; name: string }[] = [
+  { path: "oug/2002/195", name: "Codul rutier" },
+  { path: "lege/2014/85", name: "Codul insolvenței" },
+  { path: "lege/1990/31", name: "Legea societăților" },
+  { path: "lege/2023/198", name: "Legea învățământului preuniversitar" },
+  { path: "lege/2006/95", name: "Legea sănătății" },
+  { path: "lege/1991/50", name: "Legea autorizării construcțiilor" },
+  { path: "lege/2004/554", name: "Legea contenciosului administrativ" },
+  { path: "lege/2001/544", name: "Legea accesului la informații publice" },
+  { path: "lege/2016/98", name: "Legea achizițiilor publice" },
+  { path: "lege/2018/196", name: "Legea asociațiilor de proprietari" },
+  { path: "lege/1995/51", name: "Legea avocaturii" },
+  { path: "lege/2004/272", name: "Legea drepturilor copilului" },
+  { path: "lege/2001/10", name: "Legea imobilelor preluate abuziv" },
+  { path: "lege/1991/18", name: "Legea fondului funciar" },
+  { path: "lege/2006/448", name: "Legea persoanelor cu handicap" },
+  { path: "lege/2023/360", name: "Legea pensiilor publice" },
+];
+
+const KIND_LINKS: { kind: string; label: Key }[] = [
+  { kind: "lege", label: "homeKindLege" },
+  { kind: "oug", label: "homeKindOug" },
+  { kind: "og", label: "homeKindOg" },
+  { kind: "decret-lege", label: "homeKindDecretLege" },
+  { kind: "hotarare-parlament", label: "homeKindHotarareParlament" },
+];
+
+const RECENT_FORMS: Record<EventVerb, Record<PluralForm, Key>> = {
+  entered: { one: "homeRecentEnteredOne", few: "homeRecentEnteredFew", many: "homeRecentEnteredMany" },
+  modified: { one: "homeRecentModifiedOne", few: "homeRecentModifiedFew", many: "homeRecentModifiedMany" },
+  completed: { one: "homeRecentCompletedOne", few: "homeRecentCompletedFew", many: "homeRecentCompletedMany" },
+  repealed: { one: "homeRecentRepealedOne", few: "homeRecentRepealedFew", many: "homeRecentRepealedMany" },
+  unconstitutional: {
+    one: "homeRecentUnconstitutionalOne",
+    few: "homeRecentUnconstitutionalFew",
+    many: "homeRecentUnconstitutionalMany",
+  },
+  restated: { one: "homeRecentRestatedOne", few: "homeRecentRestatedFew", many: "homeRecentRestatedMany" },
+};
+
+/** Consecutive changes of one act, on one day, of one kind, become one line. */
+export function groupChanges(items: ChangeItem[]): ChangeItem[][] {
+  const groups: ChangeItem[][] = [];
+  for (const item of items) {
+    const last = groups[groups.length - 1];
+    const first = last?.[0];
+    if (last !== undefined && first?.act_path === item.act_path && first.date === item.date && first.verb === item.verb) {
+      last.push(item);
+    } else {
+      groups.push([item]);
+    }
+  }
+  return groups;
+}
 
 function CodeBadge({ act }: { act: ManifestAct }) {
   const { kind, repealedOn } = parseActStatus(act.status);
@@ -113,8 +169,33 @@ function Facts({ manifest }: { manifest: Manifest }) {
   return <p class="home-facts">{parts.join(" · ")}</p>;
 }
 
+function Sentence({ text, href, label }: { text: string; href: string; label: string }) {
+  const [before = "", after = ""] = text.split("{link}");
+  return (
+    <p>
+      {before}
+      <a href={href}>{label}</a>
+      {after}
+    </p>
+  );
+}
+
+function DoSection() {
+  return (
+    <section class="home-do" aria-labelledby="ce-poti-titlu">
+      <h2 id="ce-poti-titlu">{t("homeDoHeading")}</h2>
+      <Sentence text={t("homeDoDate")} href="/codul-muncii/art-41/2007-04-22" label={t("homeDoDateLink")} />
+      <Sentence
+        text={t("homeDoCompare")}
+        href="/codul-muncii/art-41/compara/2007-04-22..2011-05-18"
+        label={t("homeDoCompareLink")}
+      />
+      <Sentence text={t("homeDoSubscribe")} href={subscribeUrl()} label={t("homeDoSubscribeLink")} />
+    </section>
+  );
+}
+
 function DateRow({ now }: { now: string }) {
-  const [dataBefore, dataAfter] = t("homeData").split("{repo}");
   return (
     <div class="home-row">
       <section class="home-date" aria-labelledby="la-data-titlu">
@@ -133,14 +214,7 @@ function DateRow({ now }: { now: string }) {
           </div>
         </form>
       </section>
-      <section class="home-about" aria-labelledby="despre-date">
-        <h2 id="despre-date">{t("homeAboutHeading")}</h2>
-        <p>
-          {dataBefore}
-          <a href={SOURCE_REPOSITORY}>lexifina/romania-law</a>
-          {dataAfter} <a href="/despre">{t("homeAboutLink")}</a>
-        </p>
-      </section>
+      <DoSection />
     </div>
   );
 }
@@ -167,20 +241,98 @@ function Upcoming({ items, names }: { items: ChangeItem[]; names: ActNames }) {
   );
 }
 
+function Recent({ items, names }: { items: ChangeItem[]; names: ActNames }) {
+  const groups = groupChanges(items).slice(0, RECENT);
+  return (
+    <section aria-labelledby="recente">
+      <h2 id="recente">{t("homeRecentHeading")}</h2>
+      {groups.length === 0 ? (
+        <p>{t("changesNone")}</p>
+      ) : (
+        <ul class="plain home-recent">
+          {groups.map((group) => {
+            const [item] = group;
+            if (item === undefined) return null;
+            const act = actOf(item, names);
+            const own = lawKeyFromActRef(item.act_path);
+            const law = item.law !== null && group.every((other) => other.law?.key === item.law?.key) ? item.law : null;
+            return (
+              <li>
+                <time datetime={item.date}>{formatRo(item.date)}</time>
+                <a href={actUrl(act.ref)}>{act.name}</a> ·{" "}
+                {tPlural(group.length, RECENT_FORMS[item.verb], { n: grouped(group.length) })}
+                {law !== null && law.key !== own && (
+                  <>
+                    {" "}
+                    {t("homeRecentVia")} <LawLink lawKey={law.key} label={law.label} />
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p>
+        <a href="/modificari">{t("homeAllChanges")}</a>
+      </p>
+    </section>
+  );
+}
+
+function Kinds({ index }: { index: ActIndexEntry[] }) {
+  const count = (kind: string) => index.filter((entry) => entry.kind === kind).length;
+  const links = [
+    ...KIND_LINKS.map(({ kind, label }) => ({ href: `/acte?tip=${kind}`, text: `${t(label)} (${grouped(count(kind))})` })),
+    { href: "/acte", text: `${t("homeAllActs")} (${grouped(index.length)})` },
+  ];
+  return (
+    <p class="home-kinds" aria-label={t("homeKindsLabel")}>
+      {links.map((link, i) => (
+        <>
+          {i > 0 && " · "}
+          <a href={link.href}>{link.text}</a>
+        </>
+      ))}
+    </p>
+  );
+}
+
+function Popular({ index }: { index: ActIndexEntry[] }) {
+  const byPath = new Map(index.map((entry) => [entry.path, entry]));
+  const shown = POPULAR.flatMap(({ path, name }) => {
+    const entry = byPath.get(path);
+    return entry === undefined ? [] : [{ name, href: actUrl(entry.alias ?? entry.path) }];
+  });
+  return (
+    <section aria-labelledby="populare-titlu">
+      <h2 id="populare-titlu">{t("homePopularHeading")}</h2>
+      {shown.length > 0 && (
+        <ul class="plain columns home-popular">
+          {shown.map((item) => (
+            <li>
+              <a href={item.href}>{item.name}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Kinds index={index} />
+    </section>
+  );
+}
+
 export function renderHome(
   ctx: { now: string; historical: boolean },
   manifest: Manifest,
   changes: ChangesObject | null,
   names: ActNames,
+  index: ActIndexEntry[] = [],
 ) {
   const acts = ordered(manifest.acts);
   const current = acts.filter(isCurrent);
   const historical = acts.filter((act) => !isCurrent(act));
   const tabbed = historical.length > 0;
   const showHistorical = ctx.historical && tabbed;
-  const recent = (changes?.items ?? []).slice(0, RECENT);
   const upcoming = (changes?.upcoming ?? []).slice(0, UPCOMING);
-  const head = changesHead();
 
   return (
     <Layout
@@ -190,7 +342,13 @@ export function renderHome(
       home
     >
       <section class="solo wide">
-        <Hero />
+        <div class="home-top">
+          <Hero />
+          <div class="home-recents">
+            <Recent items={changes?.items ?? []} names={names} />
+            {upcoming.length > 0 && <Upcoming items={upcoming} names={names} />}
+          </div>
+        </div>
         <section id="coduri" aria-labelledby="coduri-titlu">
           <h2 id="coduri-titlu">{t("navCodes")}</h2>
           {tabbed && (
@@ -216,25 +374,9 @@ export function renderHome(
           {tabbed && (
             <CodeList acts={historical} now={ctx.now} id="coduri-istorice" tabbed hidden={!showHistorical} />
           )}
-          <p>
-            <a href="/acte">{t("homeAllActs")}</a>
-          </p>
         </section>
+        <Popular index={index} />
         <DateRow now={ctx.now} />
-        <div class={upcoming.length > 0 ? "home-changes split" : "home-changes"}>
-          <section aria-labelledby="recente">
-            <h2 id="recente">{t("homeRecentHeading")}</h2>
-            {recent.length === 0 ? (
-              <p>{t("changesNone")}</p>
-            ) : (
-              <DataTable head={head} rows={recent.map((item) => changeCells(item, names))} />
-            )}
-            <p>
-              <a href="/modificari">{t("homeAllChanges")}</a>
-            </p>
-          </section>
-          {upcoming.length > 0 && <Upcoming items={upcoming} names={names} />}
-        </div>
         <Facts manifest={manifest} />
       </section>
     </Layout>

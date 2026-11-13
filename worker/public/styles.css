@@ -601,8 +601,16 @@ del .vh,ins .vh{user-select:none}
 
 .home{background:var(--paper)}
 .home .shell>.site-footer{margin-top:0}
-.home .solo>section,.home .solo>.home-row,.home .solo>.home-changes{margin-top:56px}
-.home .solo>.home-hero{margin-top:0}
+.home .solo>section,.home .solo>.home-row{margin-top:56px}
+.home .solo>.home-top{margin-top:0}
+.home-top{display:grid;grid-template-columns:minmax(0,1fr);gap:56px}
+.home-recents h2,.home-do h2{margin-top:0}
+.home-recents section+section h2{margin-top:32px}
+.home-recent li{margin:0 0 16px}
+.home-recent time{display:block;font-size:var(--xs);line-height:var(--xs-lh);color:var(--muted)}
+.home-popular li{margin:0 0 8px}
+.home-kinds{margin:16px 0 0;color:var(--secondary)}
+@media (min-width:1101px){.home-top{grid-template-columns:minmax(0,3fr) minmax(0,2fr);column-gap:64px}}
 .home-hero h1{margin:0 0 12px}
 .home-hero .lede{max-width:none;margin:0;color:var(--secondary)}
 .home-hero .hero-search{margin:24px 0 0}
@@ -614,14 +622,11 @@ del .vh,ins .vh{user-select:none}
 .home-row h2{margin-top:0}
 .home-row>section>p{color:var(--secondary);font-size:calc(17px*var(--k));line-height:28px}
 .home-row .date-row{align-items:center}
-.home-changes{display:grid;grid-template-columns:minmax(0,1fr);gap:48px}
-.home-changes h2{margin-top:0}
 .upcoming li{margin:0;padding:12px 0}
 .upcoming li+li{border-top:1px solid var(--border)}
 .upcoming-date,.upcoming-what{display:block}
 .upcoming-date{font-weight:600}
 .upcoming-what{color:var(--secondary)}
-@media (min-width:1101px){.home-changes.split{grid-template-columns:minmax(0,2fr) minmax(0,1fr);column-gap:64px}}
 .search-filters{margin:0 0 24px}
 .search-row{display:flex;gap:8px;max-width:40em}
 .search-row .field{flex:1 1 auto;min-width:0}
@@ -745,7 +750,8 @@ mark{background:var(--accent-tint);color:var(--text);padding:0 1px}
   .js .with-contents :is(.to-top,.to-bottom){bottom:calc(var(--bar) + env(safe-area-inset-bottom) + 16px)}
   .doc-link{font-size:calc(19px*var(--k));line-height:26px}
   .doc-last{text-align:left}
-  .home .solo>section,.home .solo>.home-row,.home .solo>.home-changes{margin-top:40px}
+  .home .solo>section,.home .solo>.home-row{margin-top:40px}
+  .home-top{gap:40px}
   html{scroll-padding-top:16px}
   .doc-main{grid-column:1}
   .home-row{grid-template-columns:minmax(0,1fr);gap:40px}
