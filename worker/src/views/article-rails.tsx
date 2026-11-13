@@ -5,7 +5,7 @@ import { articleLabel } from "../lib/article-label";
 import { normalise } from "../lib/citation";
 import { formatRo } from "../lib/dates";
 import { headingsBefore, lastHeadingBefore } from "../lib/headings";
-import { labelFromKey } from "../lib/law-label";
+import { labelFromKey, namesAnAct } from "../lib/law-label";
 import type { ActArticleEntry, ActObject, ArticleObject, ArticleState, ArticleVersion } from "../lib/types";
 import { type ArticleRef, actUrl, articleUrl, rulingUrlFromKey, subscribeUrl } from "../lib/urls";
 import { Indexed } from "./indexed";
@@ -261,8 +261,9 @@ function freshnessOf(act: ActObject): { level: FreshnessLevel; text: string } {
       const change = label(fresh.newest_change);
       if (change === null) break;
       if (!fresh.change_in_repo) level = "warn";
-      text =
-        fresh.change_in_repo && fresh.newest_change_date
+      text = !namesAnAct(change)
+        ? t("freshPendingUnnamed", { act: name })
+        : fresh.change_in_repo && fresh.newest_change_date
           ? t("freshPendingScheduled", { change, date: formatRo(fresh.newest_change_date) })
           : t("freshPending", { act: name, change });
       break;

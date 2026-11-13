@@ -574,6 +574,13 @@ describe("renderArticle", () => {
     expect(
       withStatus({ status: "pending-change", newest_change: "OUG nr. 12/2026", change_in_repo: false }),
     ).toContain("nu este încă preluată în Codul civil: OUG nr. 12/2026.");
+    const unnamed = withStatus({
+      status: "pending-change",
+      newest_change: "amending acts named in the act's README.md",
+      change_in_repo: false,
+    });
+    expect(unnamed).toContain("Codul civil are modificări care nu sunt încă preluate în text.");
+    expect(unnamed).not.toContain("README");
   });
 
   it("announces the next future version of the article", () => {

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-SELECTIONS = ("codes", "primary", "consolidated")
+SELECTIONS = ("codes", "primary", "consolidated", "current")
 DEFAULT_SOURCE_URL = "https://github.com/lexifina/romania-law"
 
 
@@ -27,7 +27,7 @@ class D1Config:
 @dataclass(frozen=True)
 class Config:
     source_url: str
-    selection: Literal["codes", "primary", "consolidated"]
+    selection: Literal["codes", "primary", "consolidated", "current"]
     cache_dir: Path
     r2: R2Config | None
     d1: D1Config | None

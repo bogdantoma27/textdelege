@@ -124,6 +124,23 @@ class ConsolidatedSelectionTest(unittest.TestCase):
         self.assertTrue(all(m.alias is None for m in metas if m.slug.startswith("legea-1")))
 
 
+class CurrentSelectionTest(unittest.TestCase):
+    def test_amended_acts_join_but_repealed_withdrawn_and_other_kinds_stay_out(self):
+        law = row("legea-1-2001", None, None, "lege/2001/1", "lege", "in force")
+        amended = row("legea-3-2001", None, None, "lege/2001/3", "lege", "amended, not consolidated")
+        repealed = row("legea-2-2001", None, None, "lege/2001/2", "lege", "repealed 2010-01-01")
+        amending = row("legea-5-2001", None, None, "lege/2001/5", "lege", "amending act")
+        withdrawn = row("legea-4-2001", None, None, "lege/2001/4", "lege", "amended, not consolidated", withdrawn_by="x")
+        decree = row("decret-6-1970", None, None, "decret/1970/6", "decret", "amended, not consolidated")
+        slugs = [m.slug for m in select_acts(
+            acts_json(law, amended, repealed, amending, withdrawn, decree), PATHS, "current"
+        )]
+        for slug in ("legea-1-2001", "legea-3-2001", "codul-civil-1864", "constitutia"):
+            self.assertIn(slug, slugs)
+        for slug in ("legea-2-2001", "legea-5-2001", "legea-4-2001", "decret-6-1970"):
+            self.assertNotIn(slug, slugs)
+
+
 class AliasTest(unittest.TestCase):
     def test_alias_slug_strips_diacritics_and_spaces(self):
         metas = select_acts(acts_json(PLAIN), PATHS, "codes")
@@ -234,6 +251,6 @@ class ConfigTest(unittest.TestCase):
 
     def test_repo_config_loads(self):
         cfg = load_config(Path(__file__).parents[1] / "config.toml", {})
-        self.assertEqual(cfg.selection, "consolidated")
+        self.assertEqual(cfg.selection, "current")
         self.assertEqual(cfg.headings_min_articles, 20)
         self.assertTrue(cfg.headings)

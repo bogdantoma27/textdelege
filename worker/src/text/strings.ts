@@ -128,6 +128,7 @@ export const strings = {
   freshCurrent: "{act} este la zi. Verificat față de legislatie.just.ro la {date}.",
   freshPendingScheduled: "O modificare programată: {change}, de la {date}.",
   freshPending: "O modificare cunoscută nu este încă preluată în {act}: {change}.",
+  freshPendingUnnamed: "{act} are modificări care nu sunt încă preluate în text. Verifică textul pe sursa oficială.",
   freshStale: "Ultima verificare a {act} față de legislatie.just.ro a fost la {date}, mai veche decât ar trebui. Textul poate să nu fie la zi.",
   freshUnverified: "{act} nu a fost încă verificat față de legislatie.just.ro. Textul poate să nu fie la zi.",
   freshUnavailable: "Sursa oficială nu a putut fi consultată. Ultima verificare reușită a {act} a fost la {date}.",
