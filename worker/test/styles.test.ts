@@ -110,7 +110,7 @@ describe("styles.css", () => {
 
   it("shows live search results in a panel under the masthead field and inside the phone sheet", () => {
     expect(block(".omni")).toContain("position:relative");
-    const panel = block(":is(.header-bar,.page-search) .search-results");
+    const panel = block(":is(.header-bar,.page-search,.hero-search) .search-results");
     for (const part of ["position:absolute", "top:calc(100% + 8px)", "z-index:25", "max-height:70vh", "overflow:auto", "background:var(--paper)", "color:var(--text)", "box-shadow:0 8px 24px rgb(0 0 0/.16)"]) {
       expect(panel, part).toContain(part);
     }
@@ -308,7 +308,7 @@ describe("styles.css", () => {
     expect(relative).toEqual([".asked code", ".doc code"]);
     expect(block("sup")).toBe("sup{font-size:max(12px,.75em);line-height:0");
     expect(block(".p .n")).toContain("font-size:max(14px,.72em)");
-    for (const selector of [".p .who", ".src", ".cite .addr", ".lbl,.now,.act", ".toc-note", ".p .chg", ".gap", ".legend", ".pair.head", ".art .prov", ".home-strip div"]) {
+    for (const selector of [".p .who", ".src", ".cite .addr", ".lbl,.now,.act", ".toc-note", ".p .chg", ".gap", ".legend", ".pair.head", ".art .prov", ".home-facts"]) {
       expect(block(selector), selector).toMatch(/font-size:14px;line-height:20px/);
     }
   });
@@ -336,7 +336,9 @@ describe("styles.css", () => {
     expect(block(".plain.columns")).toBe(".plain.columns{display:grid;grid-template-columns:repeat(auto-fill,minmax(14em,1fr));gap:0 24px");
     expect(css).toContain(".shell>main:not(:has(~.rail)){grid-column:1/-1}");
     expect(css).not.toContain(".doc :is(p,ul,ol,dl,pre,.summary)");
-    expect(media("(min-width:1360px)")).toContain(".with-contents .warning.fresh-note{display:none}");
+    expect(media("(min-width:1360px)")).toContain(".with-contents main .warning.fresh-note,.with-contents main .fresh-line,.with-contents main .src p.fresh-line{display:none}");
+    expect(media("(min-width:1101px)")).toContain(".with-contents main>article,.with-contents main>.solo{padding-top:0}");
+    expect(block(".filters .form-group.date")).toBe(".filters .form-group.date{flex:0 1 10em");
     expect(block(".time .date-row")).toBe(".time .date-row{flex-wrap:nowrap;min-width:0;align-items:center");
     expect(block(".time .date-row .btn")).toBe(".time .date-row .btn{flex:none");
     expect(block(".time .date-row select.field")).toBe(".time .date-row select.field{flex:0 1 auto;min-width:0");
@@ -398,7 +400,7 @@ describe("styles.css", () => {
     expect(block(".cite-links")).toContain("display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px");
     expect(block(".p>.copy")).toContain("border:0;border-radius:4px;background:none");
     const shadows = [...rules.matchAll(/([^{}]+)\{[^{}]*box-shadow:([^;}]+)/g)].map((m) => m[1]!.trim().split("\n").pop()!);
-    expect(shadows).toEqual([":focus-visible", "main:focus-visible", ".display-panel", ".sizes label:has(:focus-visible)", ".menu-panel .display-panel", ".search-hint", ":is(.header-bar,.page-search) .search-results", ".search-overlay .sheet", ".field:focus-visible", ".checkbox input:focus-visible+label::before", ".copied", ".pt.cur,.pt.rng", ".toc-bar", ".pt,.pt.cur,.pt.rng"]);
+    expect(shadows).toEqual([":focus-visible", "main:focus-visible", ".display-panel", ".sizes label:has(:focus-visible)", ".menu-panel .display-panel", ".search-hint", ":is(.header-bar,.page-search,.hero-search) .search-results", ".search-overlay .sheet", ".field:focus-visible", ".checkbox input:focus-visible+label::before", ".copied", ".pt.cur,.pt.rng", ".toc-bar", ".pt,.pt.cur,.pt.rng"]);
     expect(css).not.toContain(".home .site-header{position:static}");
   });
 
@@ -436,8 +438,7 @@ describe("styles.css", () => {
     expect(badge).not.toContain("padding");
     expect(css).not.toContain(".badge::before");
     expect(block(".badge-green")).toBe(".badge-green{color:var(--success)");
-    expect(block(".badge-grey")).toBe(".badge-grey{color:var(--secondary)");
-    expect(block(".badge-yellow")).toBe(".badge-yellow{color:var(--accent-text)");
+    expect(block(".badge-grey,.badge-yellow")).toBe(".badge-grey,.badge-yellow{color:var(--secondary)");
     expect(block(".badge-red")).toBe(".badge-red{color:var(--danger)");
     expect(rules).not.toMatch(/\.tag\b|\.chip|\.sw\b|\.card\b/);
   });
@@ -487,7 +488,7 @@ describe("styles.css", () => {
     expect(footer).toContain("background:var(--page)");
     expect(block(".footer-head")).toContain("grid-template-columns:minmax(0,2fr) minmax(0,3fr)");
     expect(css).toContain("@media (min-width:641px){.footer-nav{grid-template-columns:repeat(3,minmax(0,1fr));gap:24px 40px}}");
-    expect(block(".footer-col h2")).toContain("text-transform:uppercase");
+    expect(block(".footer-col h2")).toContain("font-weight:600;color:var(--secondary)");
     expect(block(".footer-meta")).toContain("justify-content:space-between");
     expect(block(".footer-meta")).toContain("border-top:1px solid var(--border)");
     expect(block(".js :is(.to-top,.to-bottom)")).toContain("position:fixed;right:24px;");
@@ -508,15 +509,15 @@ describe("styles.css", () => {
     expect(css).not.toContain(".lang");
     expect(css).not.toContain("width-wide");
     expect(block(".track li.start .now,.track li.start .lbl,.track li.start .act")).toContain("transform:none;text-align:left");
-    expect(phone).toContain(".footer-head{grid-template-columns:minmax(0,1fr);gap:24px}");
+    expect(phone).toContain(".footer-head{grid-template-columns:minmax(0,1fr);gap:16px}");
     expect(css).not.toContain(".footer-status");
   });
 
   it("lays the text of a page on a white sheet over the canvas, edge to edge on phones, and not on the home page", () => {
-    expect(block("body")).toContain("overflow-x:clip;background:var(--page)");
-    expect(css).toContain("\nmain>article,main>.solo{background:var(--paper);border:1px solid var(--border);padding:40px 56px 48px}");
-    expect(block(".home main>.solo")).toContain("background:none;border:0;padding:0");
-    expect(phone).toContain("main>article,main>.solo{margin:0 -16px;padding:24px 16px 32px;border-left:0;border-right:0}");
+    expect(block("body")).toContain("overflow-x:clip;background:var(--paper)");
+    expect(css).toContain("\nmain>article,main>.solo{padding:40px 56px 48px}");
+    expect(css).not.toContain(".home main>.solo");
+    expect(phone).toContain("main>article,main>.solo{margin:0 -16px;padding:4px 16px 32px}");
     expect(media("(max-width:1359px)")).toContain("main>article,main>.solo{padding-right:32px;padding-left:32px}");
     expect(media("(min-width:1360px)")).toContain("padding-right:clamp(24px,calc(24px + (100vw - 1360px)*.4),56px)");
     expect(block(".home")).toContain("background:var(--paper)");
@@ -534,9 +535,9 @@ describe("styles.css", () => {
     expect(css).not.toContain(".search-filters .apply");
   });
 
-  it("labels rail sections in capitals without boxes and sets the citation in the serif with a monospace address", () => {
+  it("labels rail sections in plain semibold without boxes and sets the citation in the serif with a monospace address", () => {
     expect(block(".panel")).toBe(".panel{margin:0 0 32px");
-    expect(block(".panel h2")).toContain("font-size:12px;line-height:20px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)");
+    expect(block(".panel h2")).toContain("font-size:12px;line-height:20px;font-weight:600;color:var(--secondary)");
     expect(block(".cite")).toContain("font-family:var(--serif)");
     expect(block(".cite")).not.toContain("background");
     expect(block(".cite .addr")).toContain("font-family:var(--mono)");
@@ -564,9 +565,38 @@ describe("styles.css", () => {
     expect(block(".toc-list>a.fut")).not.toContain("line-through");
   });
 
+  it("styles the headings of an act as plain text by depth, without boxes or capitals", () => {
+    expect(block(".where")).toContain("color:var(--muted)");
+    expect(block(".hd")).toContain("font-size:var(--l)");
+    expect(block(".hd.d1")).toContain("font-size:var(--m)");
+    expect(block(".toc-sec")).toContain("color:var(--secondary)");
+    expect(block(".toc-sec[hidden]")).toContain("display:none");
+    for (const selector of [".where", ".hd", ".toc-sec"]) {
+      expect(block(selector), selector).not.toMatch(/border|background|text-transform/);
+    }
+  });
+
+  it("sets compact status rows, a flush stacked rail and a two-column footer on phones", () => {
+    const coarse = media("(pointer:coarse)");
+    expect(coarse).toContain(".status{row-gap:4px}");
+    expect(coarse).toContain(".status a{display:inline-block;padding:12px 0;margin:-12px 0}");
+    expect(coarse).not.toContain(".status>*{padding:12px 0");
+    expect(media("(max-width:1359px)")).toContain(".with-contents .shell>.rail{padding:0 0 16px}");
+    expect(media("(max-width:1359px)")).toContain(".rail .fresh-panel{display:none}");
+    expect(block(".footer-nav")).toContain("grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px");
+    expect(css).toContain("@media (min-width:641px){.footer-nav{grid-template-columns:repeat(3,minmax(0,1fr))");
+    expect(block(".search-overlay .sheet-title")).toContain("grid-row:1");
+  });
+
+  it("keeps no uppercase labels and no card around the page content", () => {
+    expect(css).not.toContain("text-transform:uppercase");
+    expect(css).not.toMatch(/main>article,main>\.solo\{[^}]*(border:1px|border-radius|box-shadow|background:var\(--paper\))/);
+    expect(block(".tools")).toContain("display:flex;flex-wrap:wrap");
+  });
+
   it("draws inset, warning and banner as ruled boxes with square corners", () => {
-    expect(block(".inset,.warning")).toContain("padding:16px 20px;border-left:4px solid var(--brand);background:var(--surface)");
-    expect(block(".warning")).toContain("border-left-color:var(--danger)");
+    expect(block(".inset")).toBe(".inset{margin:16px 0;color:var(--secondary)");
+    expect(block(".warning")).toContain("padding:16px 20px;border-left:4px solid var(--danger);background:var(--surface)");
     expect(block(".dated")).toBe(
       ".dated{margin:-6px 0;padding:6px 12px;border-left:3px solid var(--brand);background:var(--brand-tint);font-size:var(--xs);line-height:var(--xs-lh)",
     );
@@ -591,9 +621,9 @@ describe("styles.css", () => {
     expect(block(".tabs-panel")).not.toContain("border");
   });
 
-  it("draws tables with capitals over a strong rule in the header and rows divided by hairlines", () => {
+  it("draws tables with plain semibold heads over a strong rule in the header and rows divided by hairlines", () => {
     expect(block(".data th")).toContain("border-bottom:1px solid var(--border-strong)");
-    expect(block(".data th")).toContain("text-transform:uppercase");
+    expect(block(".data th")).toContain("font-weight:600;color:var(--secondary)");
     expect(block(".data th,.data td")).toContain("border-bottom:1px solid var(--border)");
     expect(block("table.data")).toContain("font-variant-numeric:tabular-nums");
     expect(rules).not.toContain("nth-child(even)");
@@ -615,16 +645,11 @@ describe("styles.css", () => {
   });
 
   it("builds the home page from the hero on the canvas with the numbers beside the title, the codes, the date row and the changes", () => {
-    expect(block(".home-hero")).toContain("margin:0 calc(50% - 50vw)");
-    expect(block(".home-hero")).toContain("background:var(--page)");
-    expect(block(".home-hero>div")).toContain("grid-template-columns:minmax(0,7fr) minmax(0,5fr)");
-    expect(block(".home-hero h1 em")).toBe(".home-hero h1 em{font-style:normal;color:var(--brand)");
-    expect(css).not.toContain(".home-search");
-    expect(block(".home-strip")).toContain("grid-template-columns:repeat(auto-fit,minmax(150px,1fr))");
+    expect(css).not.toMatch(/^\.home-hero\{|\.home-hero>div|\.home-hero h1 em|\.home-strip|\.home \.examples|\.source-line/m);
     expect(block(".home .solo>.home-hero")).toBe(".home .solo>.home-hero{margin-top:0");
-    expect(block(".home-strip div")).toContain("border-top:1px solid var(--border-strong)");
-    expect(block(".home-strip dd")).toContain("font-family:var(--serif);font-size:30px");
-    expect(phone).toContain(".home-strip{gap:0 16px}");
+    expect(block(".hero-search .field")).toContain("height:56px");
+    expect(block(".home-facts")).toContain("color:var(--muted)");
+    expect(block(".bare-header .header-bar")).toContain("grid-template-columns:minmax(max-content,1fr) auto");
     expect(block(".home-row")).toContain("grid-template-columns:minmax(0,1fr) minmax(0,1fr)");
     expect(css).toContain("@media (min-width:1101px){.home-changes.split{grid-template-columns:minmax(0,2fr) minmax(0,1fr);column-gap:64px}}");
     expect(css).not.toContain(".stats");
@@ -634,7 +659,7 @@ describe("styles.css", () => {
     expect(block(".pagination-prev+.pagination-next")).toContain("border-left:1px solid var(--border)");
     expect(block(".pagination-label")).toContain("color:var(--brand);font-family:var(--serif)");
     expect(block(".pagination-prev:has(+.pagination-next)")).toBe(".pagination-prev:has(+.pagination-next){padding-right:24px");
-    expect(block(".pagination-title")).toContain("text-transform:uppercase");
+    expect(block(".pagination-title")).toContain("font-weight:600;color:var(--secondary)");
     expect(phone).not.toContain(".pagination{flex-direction:column}");
     expect(phone).toContain(".pagination-prev+.pagination-next{padding-left:12px}");
   });
@@ -687,7 +712,7 @@ describe("styles.css", () => {
     expect(block(".toc-list>a.cur .n")).toBe(".toc-list>a.cur .n{color:var(--accent)");
     expect(block(".toc-list>a")).toContain("border-radius:4px");
     expect(block(".toc-list>a")).not.toContain("border-left");
-    expect(block(".toc-head .ttl")).toContain("text-transform:uppercase");
+    expect(block(".toc-head .ttl")).toContain("font-weight:600;color:var(--secondary)");
   });
 
   it("turns the contents list into a sheet with a bottom bar below 1100 px and never hides it", () => {
@@ -704,7 +729,7 @@ describe("styles.css", () => {
     expect(css).not.toContain(".with-contents .wrap");
     expect(block(".shell")).toContain("grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:minmax(0,1fr) auto;column-gap:40px");
     expect(block(".shell>.site-footer")).toContain("grid-column:1/-1;align-self:end");
-    expect(block(".with-contents .shell>.site-footer")).toBe(".with-contents .shell>.site-footer{grid-column:2;grid-row:3;margin:72px 0 0;padding:28px 0 32px");
+    expect(block(".with-contents .shell>.site-footer")).toBe(".with-contents .shell>.site-footer{grid-column:2;grid-row:3;margin:72px 0 0;padding:28px 0 32px;border-top:1px solid var(--border);background:none");
     expect(block(".head")).toContain("justify-content:space-between");
     expect(block(".with-contents .shell")).toContain("grid-template-columns:260px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto");
     expect(css).toContain(".with-contents .shell>.toc-sheet{display:flex;position:sticky;top:calc(var(--head) + 32px);max-height:calc(100vh - var(--head) - 64px)");
@@ -773,7 +798,7 @@ describe("styles.css", () => {
     const print = media("print");
     expect(print).toContain("--page:#ffffff;--paper:#ffffff;--text:#000000");
     expect(print).toContain(".p>.copy,.p>.copied{display:none}");
-    expect(print).toContain(".skip,.site-header,.site-footer,.search-overlay,.menu,.display,.to-top,.to-bottom,.rail,.toc-sheet,.toc-bar,.tabs,.options,.time,.crumbs{display:none}");
+    expect(print).toContain(".skip,.site-header,.site-footer,.search-overlay,.menu,.display,.to-top,.to-bottom,.rail,.toc-sheet,.toc-bar,.tabs,.options,.time,.tools,.crumbs{display:none}");
     expect(print).toContain("main>article,main>.solo{border:0;padding:0}");
     expect(print).toContain(".shell{display:block}");
   });

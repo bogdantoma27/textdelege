@@ -18,6 +18,7 @@ const entry = (html: string, href: string) => {
 
 const NOW = "2026-11-08";
 const BIG = "lege/2099/1";
+const HEADED = "lege/2098/1";
 const COUNT = 260;
 
 let codul: ActObject;
@@ -127,7 +128,31 @@ beforeAll(async () => {
   for (const entry of big.articles) {
     await put(`acts/${BIG}/art/${entry.file}.json`, bigArticle(entry));
   }
+  const headed = headedAct(big);
+  await put(`acts/${HEADED}/act.json`, headed);
+  for (const entry of headed.articles) {
+    await put(`acts/${HEADED}/art/${entry.file}.json`, { ...bigArticle(entry), act: { ...bigArticle(entry).act, path: HEADED } });
+  }
 });
+
+function headedAct(big: ActObject): ActObject {
+  const heading = (n: number) => (n < 40 ? 2 : n < 70 ? 3 : 5);
+  return {
+    ...big,
+    path: HEADED,
+    slug: "cu-titluri",
+    portal: "https://example.invalid/cu-titluri",
+    headings: [
+      { kind: "crt", label: "Cartea I", name: "Despre persoane", depth: 0 },
+      { kind: "ttl", label: "Titlul I", name: "Dispoziții generale", depth: 1 },
+      { kind: "cap", label: "Capitolul I", name: "Început", depth: 2 },
+      { kind: "cap", label: "Capitolul II", name: "Mijloc", depth: 2 },
+      { kind: "ttl", label: "Titlul II", name: "Sfârșit", depth: 1 },
+      { kind: "cap", label: "Capitolul I", name: "", depth: 2 },
+    ],
+    articles: big.articles.map((entry) => ({ ...entry, heading: heading(Number(entry.number)) })),
+  };
+}
 
 const TABS: [string, ActTab, string][] = [
   ["/codul-civil", "text", "Text"],
@@ -360,14 +385,20 @@ describe("contents", () => {
     expect(options(view("text", {}, repealed)).map(([value]) => value)).toContain("2023-07-09");
   });
 
-  it("shows the warning box in the text column under the status row when the act may be out of date", () => {
+  it("shows a muted line under the status row when the act may be out of date, and a box only for a missing amendment", () => {
     const stale = structuredClone(codul);
     stale.freshness = { ...stale.freshness!, status: "stale" };
     const html = view("text", {}, stale);
     expect(html).toMatch(
-      /<h1>Codul civil<\/h1><div class="status">[^]*?<\/div><div class="warning fresh-note"><strong class="warning-text"><span class="vh">Atenție: <\/span>[^]*?mai veche decât ar trebui[^]*?<\/strong><\/div><section class="time compact"/,
+      /<h1>Codul civil<\/h1><div class="status">[^]*?<\/div><p class="fresh-line">[^]*?mai veche decât ar trebui[^]*?<\/p><section class="time compact"/,
     );
-    expect(view("text", { date: "2012-01-01" }, stale)).toContain('<div class="warning fresh-note"><strong class="warning-text">');
+    expect(html).not.toContain("fresh-note");
+    expect(view("text", { date: "2012-01-01" }, stale)).toContain('<p class="fresh-line">');
+    const missing = structuredClone(codul);
+    missing.freshness = { ...missing.freshness!, status: "pending-change", newest_change: missing.laws[0]!.key, change_in_repo: false };
+    const boxed = view("text", {}, missing);
+    expect(boxed).toMatch(/<\/div><div class="warning fresh-note"><strong class="warning-text">[^]*?<\/strong><\/div><section class="time compact"/);
+    expect(boxed).not.toContain("fresh-line");
   });
 
   it("computes states as of a date", () => {
@@ -671,5 +702,62 @@ describe("date tab", () => {
     expect(html).toContain('href="https://example.invalid/287"');
     expect(html).toContain("Legea nr. 8/1996");
     expect(html).toContain("CC0");
+  });
+});
+
+describe("headings of an act", () => {
+  const where = (html: string) => /<p class="where">([^<]*)<\/p>/.exec(html)?.[1];
+  const headingRows = (html: string) => [...html.matchAll(/<h3 class="hd d(\d)"><span class="hd-label">([^<]*)<\/span>([^<]*)<\/h3>/g)].map((m) => `${m[1]}|${m[2]}|${m[3]!.trim()}`);
+
+  it("prints the headings between the articles on the text page, once each", async () => {
+    const html = await page(`/${HEADED}`);
+    expect(headingRows(html)).toEqual([
+      "0|Cartea I|Despre persoane",
+      "1|Titlul I|Dispoziții generale",
+      "2|Capitolul I|Început",
+      "2|Capitolul II|Mijloc",
+    ]);
+    const at = (needle: string) => html.indexOf(needle);
+    expect(at('<h3 class="hd d0">')).toBeLessThan(at('id="art-1"'));
+    expect(at("Capitolul II")).toBeGreaterThan(at('id="art-39"'));
+    expect(at("Capitolul II")).toBeLessThan(at('id="art-40"'));
+    expect(where(html)).toBeUndefined();
+  });
+
+  it("opens a later page with the full path of its first article and carries on from there", async () => {
+    const html = await page(`/${HEADED}?pagina=2`);
+    expect(where(html)).toBe("Cartea I Despre persoane › Titlul I Dispoziții generale › Capitolul II Mijloc");
+    expect(headingRows(html)).toEqual(["1|Titlul II|Sfârșit", "2|Capitolul I|"]);
+    expect(html.indexOf('<p class="where">')).toBeLessThan(html.indexOf('id="art-51"'));
+    expect(html.indexOf('<h3 class="hd d1">')).toBeGreaterThan(html.indexOf('id="art-69"'));
+    expect(html.indexOf('<h3 class="hd d1">')).toBeLessThan(html.indexOf('id="art-70"'));
+  });
+
+  it("leaves an act without headings as it was", async () => {
+    const html = await page(`/${BIG}`);
+    expect(html).not.toContain('class="hd');
+    expect(html).not.toContain('class="where"');
+    expect(html).not.toContain("toc-sec");
+  });
+
+  it("puts a heading row in the contents before the first article under it, not while filtering", async () => {
+    const html = await page(`/${HEADED}/art-45`);
+    const toc = html.slice(html.indexOf('<div class="toc-list">'), html.indexOf("</nav>", html.indexOf('<div class="toc-list">')));
+    const rows = [...toc.matchAll(/<div class="toc-sec d(\d)"><span class="l">([^<]*)<\/span>(?:<span class="d">([^<]*)<\/span>)?<\/div>/g)];
+    // The contents show a window of 61 articles around the open one: 15 to 75.
+    expect(rows.map((m) => `${m[1]}|${m[2]}|${m[3] ?? ""}`)).toEqual(["2|Capitolul II|Mijloc", "1|Titlul II|Sfârșit", "2|Capitolul I|"]);
+    expect(toc.indexOf("Capitolul II")).toBeGreaterThan(toc.indexOf('href="/lege/2098/1/art-39"'));
+    expect(toc.indexOf("Capitolul II")).toBeLessThan(toc.indexOf('href="/lege/2098/1/art-40"'));
+    expect(toc.indexOf("Titlul II")).toBeLessThan(toc.indexOf('href="/lege/2098/1/art-70"'));
+    expect(toc).toContain('class="cur"');
+    const filtered = await page(`/${HEADED}/art-45?cuprins=45`);
+    expect(filtered).not.toContain("toc-sec");
+  });
+
+  it("shows the path above the title of an article", async () => {
+    const html = await page(`/${HEADED}/art-45`);
+    expect(where(html)).toBe("Cartea I Despre persoane › Titlul I Dispoziții generale › Capitolul II Mijloc");
+    expect(html.indexOf('<p class="where">')).toBeLessThan(html.indexOf("<h1>"));
+    expect(await page(`/${BIG}/art-45`)).not.toContain('class="where"');
   });
 });

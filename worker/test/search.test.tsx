@@ -17,9 +17,11 @@ async function insert(file: string, state: string, number: string, title: string
 }
 
 describe("search", () => {
-  it("shows a visible field labelled Caută, filled with the query, beside the header fields", async () => {
+  it("shows one visible field labelled Caută, filled with the query, and none in the header", async () => {
     const html = await page("/cauta?q=text");
-    expect(html.match(/type="search"/g)?.length).toBe(3);
+    expect(html.match(/type="search"/g)?.length).toBe(1);
+    expect(html).not.toContain('class="find"');
+    expect(html).not.toContain('id="q-overlay"');
     expect(html).toContain('<label class="label" for="q-results">Caută</label>');
     expect(html).toMatch(/<input class="field" id="q-results" type="search" name="q" value="text"/);
     expect(html).toMatch(/<button class="btn secondary" type="submit">Caută<\/button>/);

@@ -169,7 +169,9 @@ def act_object(
     laws: list[Law],
     rulings: list[Ruling],
     freshness: dict | None,
+    structure: dict | None = None,
 ) -> dict:
+    headed = (structure or {}).get("articles", {})
     index = []
     per_year: dict[int, int] = {}
     for article in articles:
@@ -177,23 +179,24 @@ def act_object(
         changes = [event for event in events if event.verb != "entered"]
         for event in changes:
             per_year[event.date.year] = per_year.get(event.date.year, 0) + 1
-        index.append(
-            {
-                "file": _stem(article),
-                "number": article.number,
-                "title": article.title,
-                "lead": lead(article) if article.title is None else None,
-                "state": article.state,
-                "versions": len(article.versions),
-                "changes": len(changes),
-                "first": _iso(article.versions[0].from_) if article.versions else None,
-                "last_change": _iso(max((e.date for e in events), default=None)),
-            }
-        )
+        entry = {
+            "file": _stem(article),
+            "number": article.number,
+            "title": article.title,
+            "lead": lead(article) if article.title is None else None,
+            "state": article.state,
+            "versions": len(article.versions),
+            "changes": len(changes),
+            "first": _iso(article.versions[0].from_) if article.versions else None,
+            "last_change": _iso(max((e.date for e in events), default=None)),
+        }
+        if article.number in headed:
+            entry["heading"] = headed[article.number]
+        index.append(entry)
     amended = sorted(
         (entry for entry in index if entry["changes"]), key=lambda entry: -entry["changes"]
     )
-    return {
+    result = {
         "schema": "textdelege/act/1",
         "path": act.path,
         "slug": act.slug,
@@ -223,6 +226,9 @@ def act_object(
             {"key": law.key, "label": law.label} for law in sorted(laws, key=lambda l: l.key)
         ],
     }
+    if structure and structure.get("headings"):
+        result["headings"] = structure["headings"]
+    return result
 
 
 def law_object(law: Law) -> dict:

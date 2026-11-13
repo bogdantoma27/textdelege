@@ -33,7 +33,8 @@
       "versions": 2,
       "changes": 1,
       "first": "2011-10-01",
-      "last_change": "2023-07-09"
+      "last_change": "2023-07-09",
+      "heading": 2
     },
     {
       "file": "art-0002",
@@ -44,7 +45,8 @@
       "versions": 1,
       "changes": 0,
       "first": "2011-10-01",
-      "last_change": "2011-10-01"
+      "last_change": "2011-10-01",
+      "heading": 3
     }
   ],
   "timeline": [
@@ -91,6 +93,32 @@
     {
       "key": "legea-71-2011",
       "label": "Legea nr. 71/2011"
+    }
+  ],
+  "headings": [
+    {
+      "kind": "crt",
+      "label": "Cartea I",
+      "name": "Despre persoane",
+      "depth": 0
+    },
+    {
+      "kind": "ttl",
+      "label": "Titlul I",
+      "name": "Dispoziții generale",
+      "depth": 1
+    },
+    {
+      "kind": "cap",
+      "label": "Capitolul I",
+      "name": "Aplicarea legii",
+      "depth": 2
+    },
+    {
+      "kind": "cap",
+      "label": "Capitolul II",
+      "name": "Interpretarea legii",
+      "depth": 2
     }
   ]
 }

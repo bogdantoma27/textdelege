@@ -33,6 +33,8 @@ class Config:
     d1: D1Config | None
     time_budget_minutes: float | None = None
     workers: int | None = None
+    headings: bool = False
+    headings_min_articles: int = 20
 
 
 def _section(data: dict, name: str, keys: tuple[str, ...], env: Mapping[str, str]):
@@ -66,4 +68,6 @@ def load_config(path: Path, env: Mapping[str, str] = os.environ) -> Config:
         d1=D1Config(*d1) if d1 else None,
         time_budget_minutes=data.get("time_budget_minutes"),
         workers=data.get("workers"),
+        headings=bool(data.get("headings", False)),
+        headings_min_articles=int(data.get("headings_min_articles", 20)),
     )

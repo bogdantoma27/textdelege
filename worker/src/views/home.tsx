@@ -6,7 +6,7 @@ import type { ChangeItem, ChangesObject, Manifest, ManifestAct } from "../lib/ty
 import { SOURCE_REPOSITORY, actUrl } from "../lib/urls";
 import { type ActNames, actOf, changeAction, changeArticle, changeCells, changesHead } from "./changes";
 import { DataTable, DateField, DateHint, Tabs } from "./components";
-import { Layout, ORIGIN } from "./layout";
+import { Layout, ORIGIN, SearchForm } from "./layout";
 import { StatusBadge, grouped } from "./shared";
 
 const RECENT = 10;
@@ -78,81 +78,38 @@ function CodeList(props: { acts: ManifestAct[]; now: string; id: string; tabbed:
   );
 }
 
-const EXAMPLES: Key[] = [
-  "homeExampleConstitution",
-  "homeExampleCivil",
-  "homeExampleCivilTort",
-  "homeExamplePenal",
-  "homeExamplePenalTheft",
-  "homeExampleLabour",
-  "homeExampleLabourDismissal",
-  "homeExampleFiscal",
-  "homeExampleCivilProcedure",
-  "homeExamplePenalProcedure",
-  "homeExampleAdministrative",
-  "homeExampleCustoms",
-];
-const SHOWN_EXAMPLES = 3;
-
-function drawExamples(pool: readonly Key[], count: number): Key[] {
-  const keys = [...pool];
-  for (let i = 0; i < count && i < keys.length; i++) {
-    const j = i + Math.floor(Math.random() * (keys.length - i));
-    [keys[i], keys[j]] = [keys[j]!, keys[i]!];
-  }
-  return keys.slice(0, count);
-}
-
-function Hero({ manifest }: { manifest: Manifest }) {
-  const [plain, highlighted] = t("homeHeading").split("{em}");
-  const [sourceBefore, sourceAfter] = t("homeSource").split("{repo}");
+function Hero() {
   return (
     <section class="home-hero" aria-labelledby="home-titlu">
-      <div>
-        <div>
-          <h1 id="home-titlu">
-            {plain}
-            <em>{highlighted}</em>
-          </h1>
-          <p class="lede">{t("homeIntro")}</p>
-          <p class="source-line">
-            {sourceBefore}
-            <a href={SOURCE_REPOSITORY}>lexifina/romania-law</a>
-            {sourceAfter}
-          </p>
-          <p class="examples">
-            {t("homeTryLabel")}{" "}
-            {drawExamples(EXAMPLES, SHOWN_EXAMPLES).map((key) => (
-              <a href={`/cauta?q=${encodeURIComponent(t(key))}`}>{t(key)}</a>
-            ))}
-          </p>
-        </div>
-        <Strip manifest={manifest} />
-      </div>
+      <h1 id="home-titlu">{t("homeHeading")}</h1>
+      <p class="lede">{t("homeIntro")}</p>
+      <SearchForm id="q" class="omni hero-search" />
     </section>
   );
 }
 
-function Strip({ manifest }: { manifest: Manifest }) {
+const ACTS: Record<PluralForm, Key> = {
+  one: "homeActsCountOne",
+  few: "homeActsCountFew",
+  many: "homeActsCountMany",
+};
+const RULINGS: Record<PluralForm, Key> = {
+  one: "homeRulingsCountOne",
+  few: "homeRulingsCountFew",
+  many: "homeRulingsCountMany",
+};
+
+function Facts({ manifest }: { manifest: Manifest }) {
   const { counts } = manifest;
   const verified = manifest.freshness.checked_against_official_source;
-  const cells: [Key, string][] = [
-    ["homeStatActs", grouped(counts.acts)],
-    ["homeStatArticles", grouped(counts.articles)],
-    ["homeStatVersions", grouped(counts.versions)],
-    ["homeStatRulings", grouped(counts.rulings)],
-    ...(verified ? [["homeStatVerified", formatRo(verified)] as [Key, string]] : []),
+  const parts = [
+    tPlural(counts.acts, ACTS, { n: grouped(counts.acts) }),
+    tPlural(counts.articles, ARTICLES, { n: grouped(counts.articles) }),
+    tPlural(counts.versions, VERSIONS, { n: grouped(counts.versions) }),
+    tPlural(counts.rulings, RULINGS, { n: grouped(counts.rulings) }),
+    ...(verified ? [t("homeFactsVerified", { date: formatRo(verified) })] : []),
   ];
-  return (
-    <dl class="home-strip" aria-label={t("homeStatsLabel")}>
-      {cells.map(([label, value]) => (
-        <div>
-          <dt>{t(label)}</dt>
-          <dd>{value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
+  return <p class="home-facts">{parts.join(" · ")}</p>;
 }
 
 function DateRow({ now }: { now: string }) {
@@ -226,13 +183,13 @@ export function renderHome(
 
   return (
     <Layout
-      title={t("homeHeading").replace("{em}", "")}
+      title={t("homeHeading")}
       description={t("homeDescription")}
       canonical={`${ORIGIN}/`}
       home
     >
       <section class="solo wide">
-        <Hero manifest={manifest} />
+        <Hero />
         <section id="coduri" aria-labelledby="coduri-titlu">
           <h2 id="coduri-titlu">{t("navCodes")}</h2>
           {tabbed && (
@@ -277,6 +234,7 @@ export function renderHome(
           </section>
           {upcoming.length > 0 && <Upcoming items={upcoming} names={names} />}
         </div>
+        <Facts manifest={manifest} />
       </section>
     </Layout>
   );

@@ -108,6 +108,7 @@ export function renderSearch(page: SearchPage) {
       title={t("searchTitle")}
       canonical={`${ORIGIN}/cauta`}
       query={query}
+      pageSearch
       noindex
     >
       <section class="solo wide">

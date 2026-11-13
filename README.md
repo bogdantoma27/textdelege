@@ -80,7 +80,7 @@ Sursele designului și ce folosim pe site sunt descrise în [docs/design.md](doc
 
 ### Limite
 
-Textele consolidate de aici nu sunt oficiale. Singura formă autentică este cea publicată în Monitorul Oficial. Unele acte sunt marcate în sursă „amended, not consolidated”: modificările lor sunt cunoscute, dar textul poate să nu le cuprindă pe toate. Sursa nu păstrează titlurile capitolelor, așa că cuprinsul unui act este o listă de articole. Căutarea acoperă doar textul în vigoare.
+Textele consolidate de aici nu sunt oficiale. Singura formă autentică este cea publicată în Monitorul Oficial. Unele acte sunt marcate în sursă „amended, not consolidated”: modificările lor sunt cunoscute, dar textul poate să nu le cuprindă pe toate. Sursa nu păstrează titlurile de părți, cărți, titluri, capitole și secțiuni: acestea sunt preluate de pe portalul oficial legislatie.just.ro, în forma actuală a actului, și apar neschimbate și la versiunile mai vechi. Căutarea acoperă doar textul în vigoare.
 
 ### Contribuții
 
@@ -147,7 +147,7 @@ The sources of the design and what the site uses are described in [docs/design.m
 
 ### Limits
 
-The consolidated texts here are not official; the only authentic form is the one published in Monitorul Oficial. Some acts are marked "amended, not consolidated" in the source: their amendments are known, but the text may not include all of them. The source does not keep chapter headings, so the contents of an act are a list of articles. Search covers the text in force only.
+The consolidated texts here are not official; the only authentic form is the one published in Monitorul Oficial. Some acts are marked "amended, not consolidated" in the source: their amendments are known, but the text may not include all of them. The source does not keep part, book, title, chapter and section headings: they come from the official portal legislatie.just.ro, in the act's current form, and are shown as they are for older versions. Search covers the text in force only.
 
 ### Contributing
 

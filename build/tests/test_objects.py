@@ -167,6 +167,21 @@ class LeadTests(unittest.TestCase):
         obj = act_object(ACT, [art1112(), untitled("(1) Text.")], [], [], None)
         self.assertEqual([entry["lead"] for entry in obj["articles"]], [None, "Text."])
 
+    def test_headings_are_added_only_with_a_structure(self):
+        plain = act_object(ACT, [art1112(), untitled("(1) Text.")], [], [], None)
+        self.assertNotIn("headings", plain)
+        self.assertTrue(all("heading" not in entry for entry in plain["articles"]))
+        structure = {
+            "headings": [{"kind": "cap", "label": "Capitolul I", "name": "Dispoziții generale", "depth": 0}],
+            "articles": {"1112": 0, "999": 0},
+        }
+        obj = act_object(ACT, [art1112(), untitled("(1) Text.")], [], [], None, structure)
+        self.assertEqual(obj["headings"], structure["headings"])
+        self.assertEqual([entry.get("heading") for entry in obj["articles"]], [0, None])
+        self.assertEqual(obj["schema"], "textdelege/act/1")
+        empty = act_object(ACT, [art1112()], [], [], None, {"headings": [], "articles": {}})
+        self.assertNotIn("headings", empty)
+
 
 def other(file, number, title, versions=None, state="in-force"):
     return Article(file, number, title, versions or [], state, None)

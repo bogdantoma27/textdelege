@@ -69,6 +69,12 @@ describe("Layout", () => {
     expect(overlay).toContain('name="q"');
     expect(overlay).toContain('<a class="close" href="#">');
     expect(overlay).toContain("Închide");
+    expect(overlay.indexOf('class="sheet-title"')).toBeLessThan(overlay.indexOf('class="close"'));
+    expect(overlay.indexOf('class="close"')).toBeLessThan(overlay.indexOf('id="q-overlay"'));
+    expect(overlay).toContain('placeholder="Caută sau citează un articol"');
+    expect(overlay).toContain('<p class="sheet-hint">De exemplu: „art. 1112 Codul civil”, „Legea 31/1990”</p>');
+    expect(html.slice(0, html.indexOf('id="cauta"'))).toContain("Caută sau citează: „art. 1112 Codul civil”");
+    expect(html.match(/type="search"/g)).toHaveLength(2);
   });
 
   it("puts the skip link first among focusable elements and targets the main slot", () => {
@@ -202,10 +208,12 @@ describe("Layout", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("marks the home page on the body and keeps the masthead search there too", () => {
+  it("marks the home page on the body and leaves the masthead search out, since the page has its own", () => {
     const html = render({ home: true });
-    expect(html.match(/type="search"/g)).toHaveLength(2);
-    expect(html).toContain('<body class="home">');
+    expect(html.match(/type="search"/g)).toBeNull();
+    expect(html).not.toContain('class="find"');
+    expect(html).toContain('<body class="home bare-header">');
+    expect(render({ pageSearch: true })).toContain('<body class="bare-header">');
   });
 
   it("keeps one header search field and one in the overlay that the phone button opens", () => {

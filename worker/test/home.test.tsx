@@ -29,54 +29,19 @@ async function patchSite(patch: (site: { items: ChangeItem[]; upcoming: ChangeIt
 }
 
 describe("home", () => {
-  it("keeps the search in the masthead and shows the numbers beside the title", async () => {
+  it("moves the search from the masthead into the hero, with no examples, source line or stats strip", async () => {
     const html = await page("/");
-    expect(html.match(/type="search"/g)).toHaveLength(2);
+    expect(html.match(/type="search"/g)).toHaveLength(1);
     expect(html).toContain('id="q"');
-    expect(html).toContain('id="q-overlay"');
-    expect(html).not.toContain("q-main");
-    expect(html).toContain('<body class="home">');
+    expect(html).not.toContain('id="q-overlay"');
+    expect(html).not.toContain('class="find"');
+    expect(html).not.toContain('class="search-overlay"');
+    expect(html).toContain('<body class="home bare-header">');
     const hero = html.slice(html.indexOf('class="home-hero"'), html.indexOf('id="coduri"'));
-    expect(hero).toContain('<dl class="home-strip"');
-    expect(hero.indexOf('class="examples"')).toBeLessThan(hero.indexOf('class="home-strip"'));
-  });
-
-  it("offers three example searches under the introduction, drawn from the pool on every visit", async () => {
-    const pool = [
-      "art. 21 Constituția",
-      "art. 1112 Codul civil",
-      "art. 1357 Codul civil",
-      "art. 188 Codul penal",
-      "art. 228 Codul penal",
-      "art. 52 alin. (1) Codul muncii",
-      "art. 65 Codul muncii",
-      "art. 7 Codul fiscal",
-      "art. 194 Codul de procedură civilă",
-      "art. 83 Codul de procedură penală",
-      "art. 5 Codul administrativ",
-      "art. 1 Codul vamal",
-    ];
-    const seen = new Set<string>();
-    for (let visit = 0; visit < 12; visit++) {
-      const html = await page("/");
-      const examples = html.slice(html.indexOf('class="examples"'));
-      const links = [...examples.slice(0, examples.indexOf("</p>")).matchAll(/<a href="\/cauta\?q=([^"]+)">/g)];
-      const shown = links.map((m) => decodeURIComponent(m[1]!));
-      expect(shown).toHaveLength(3);
-      expect(new Set(shown).size).toBe(3);
-      for (const example of shown) expect(pool).toContain(example);
-      seen.add(shown.join("|"));
-      expect(examples).toContain("Încearcă:");
-    }
-    expect(seen.size).toBeGreaterThan(1);
-  });
-
-  it("says under the introduction where the data comes from", async () => {
-    const html = await page("/");
-    expect(html).toContain(
-      '<p class="source-line">Toate datele vin din <a href="https://github.com/lexifina/romania-law">lexifina/romania-law</a>, un repo public pe GitHub. Textdelege este interfața care le face ușor de citit, de căutat și de citat.</p>',
-    );
-    expect(html.indexOf('class="source-line"')).toBeLessThan(html.indexOf('class="examples"'));
+    expect(hero).toContain('<form class="omni hero-search" role="search"');
+    expect(hero.indexOf("<h1")).toBeLessThan(hero.indexOf('class="lede"'));
+    expect(hero.indexOf('class="lede"')).toBeLessThan(hero.indexOf('role="search"'));
+    for (const gone of ['class="examples"', "source-line", "home-strip", "Încearcă"]) expect(html).not.toContain(gone);
   });
 
   it("asks for a day in the hero and sends it to the point-in-time page", async () => {
@@ -177,16 +142,20 @@ describe("home", () => {
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
-  it("shows the manifest counts and the day of the last check beside the title", async () => {
+  it("ends the page with one muted sentence of counts and the day of the last check", async () => {
     const html = await page("/");
-    const strip = html.slice(html.indexOf('<dl class="home-strip"'), html.indexOf("</dl>"));
-    expect(strip).toContain("<dt>acte</dt><dd>2</dd>");
-    expect(strip).toContain("<dt>articole</dt><dd>3</dd>");
-    expect(strip).toContain("<dt>versiuni</dt><dd>4</dd>");
-    expect(strip).toContain("<dt>decizii</dt><dd>1</dd>");
-    expect(strip).toContain("<dt>ultima verificare a surselor</dt><dd>01.11.2026</dd>");
-    expect(strip).not.toContain("legi modificatoare");
-    expect(html.indexOf('class="home-strip"')).toBeLessThan(html.indexOf('id="coduri"'));
+    const facts = /<p class="home-facts">([^<]*)<\/p>/.exec(html)?.[1];
+    expect(facts).toBe("2 acte · 3 articole · 4 versiuni · 1 decizie · surse verificate la 01.11.2026");
+    expect(html.indexOf('aria-labelledby="recente"')).toBeLessThan(html.indexOf('class="home-facts"'));
+    expect(html.indexOf('class="home-facts"')).toBeLessThan(html.indexOf("<footer"));
+  });
+
+  it("writes large counts with de after the number", async () => {
+    await patchManifest((manifest) => {
+      manifest.counts.acts = 21;
+      manifest.counts.articles = 13480;
+    });
+    expect(await page("/")).toContain("21 de acte · 13.480 de articole");
   });
 
   it("describes each code by the day it entered into force and its size", async () => {
@@ -368,7 +337,7 @@ describe("home", () => {
   it("says what the site is and credits the source repository beside the date form", async () => {
     const html = await page("/");
     const hero = html.slice(html.indexOf('class="home-hero"'), html.indexOf('id="coduri"'));
-    expect(hero).toContain('<h1 id="home-titlu">Legile României, <em>cu toate modificările lor.</em></h1>');
+    expect(hero).toContain('<h1 id="home-titlu">Legile României, cu toate modificările lor.</h1>');
     expect(hero).toContain("Vezi ce spune un articol azi, ce spunea înainte și cine l-a schimbat.");
     expect(html).toContain("<title>Legile României, cu toate modificările lor. | Textdelege</title>");
     const about = html.slice(html.indexOf('class="home-about"'), html.indexOf('class="home-changes'));

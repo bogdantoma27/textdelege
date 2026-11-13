@@ -15,7 +15,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import extractcache, historyindex
+from . import extractcache, historyindex, structure as structure_module
 from .acts import ActMeta, old_folder_for, select_acts
 from .config import Config, load_config
 from .d1 import SCHEMA_VERSION, D1Client, D1Error, D1QuotaExceeded
@@ -352,7 +352,12 @@ def act_row(meta: ActMeta, freshness_status: str | None, articles: int) -> dict:
 
 
 def build_outputs(
-    repo: GitRepo, data: Extracted, build_id: str, now: datetime, today: date
+    repo: GitRepo,
+    data: Extracted,
+    build_id: str,
+    now: datetime,
+    today: date,
+    structure_of: Callable[[ActMeta, int], dict | None] | None = None,
 ) -> tuple[list[tuple[str, dict]], IndexRows, dict, dict[str, int]]:
     head = repo.head()
     articles_by_act = data.articles_by_act
@@ -379,7 +384,10 @@ def build_outputs(
         status = (freshness.get(meta.path) or {}).get("status")
         objects.append((
             object_key("act", meta.path),
-            act_object(meta, articles, act_laws, rulings_for(meta.path, ""), freshness.get(meta.path)),
+            act_object(
+                meta, articles, act_laws, rulings_for(meta.path, ""), freshness.get(meta.path),
+                structure_of(meta, len(articles)) if structure_of else None,
+            ),
         ))
         rows.acts.append(act_row(meta, status, len(articles)))
         for position, article in enumerate(articles):
@@ -542,7 +550,7 @@ def run_checks(
     return samples, mismatches, seed, None
 
 
-def cmd_build(args, *, today, now, oracle, r2, d1) -> int:
+def cmd_build(args, *, today, now, oracle, r2, d1, fetch=None) -> int:
     started = time.monotonic()
     config = load_config(args.config)
     r2, d1 = clients(config, r2, d1, args.dry_run)
@@ -595,7 +603,16 @@ def cmd_build(args, *, today, now, oracle, r2, d1) -> int:
         return 0
     build_id = new_state["build"]
     events_started = time.monotonic()
-    objects, rows, manifest, counts = build_outputs(repo, data, build_id, now, today)
+    structure_of = None
+    if config.headings:
+        def structure_of(meta: ActMeta, count: int) -> dict | None:
+            if count < config.headings_min_articles:
+                return None
+            return structure_module.load(
+                meta, meta.latest, config.cache_dir, fetch or structure_module.fetch_page
+            )
+
+    objects, rows, manifest, counts = build_outputs(repo, data, build_id, now, today, structure_of)
     events_seconds = time.monotonic() - events_started
     publish_started = time.monotonic()
 
@@ -707,6 +724,7 @@ def main(
     oracle: Callable[[Sample], str | None] | None = None,
     r2=None,
     d1=None,
+    fetch: Callable[[str], bytes | None] | None = None,
 ) -> int:
     try:
         args = parser().parse_args(argv)
@@ -715,7 +733,7 @@ def main(
     now = now or datetime.now(timezone.utc)
     today = today or build_day(now)
     try:
-        return args.func(args, today=today, now=now, oracle=oracle, r2=r2, d1=d1)
+        return args.func(args, today=today, now=now, oracle=oracle, r2=r2, d1=d1, fetch=fetch)
     except Exception as error:
         if os.environ.get("TEXTDELEGE_DEBUG") == "1":
             traceback.print_exc()

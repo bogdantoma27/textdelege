@@ -202,6 +202,45 @@ class CliTest(unittest.TestCase):
     def state(self):
         return json.loads((self.cache / "state.json").read_text(encoding="utf-8"))
 
+    def test_headings_come_from_the_injected_fetcher_only_when_enabled(self):
+        from build.tests.test_structure import art, unit
+
+        page = (
+            "<html><body>"
+            + unit("CRT", "Cartea I", "Despre persoane", unit("CAP", "Capitolul I", "Dispoziții generale", art("Articolul 1")))
+            + unit("CAP", "Capitolul II", "Alt capitol", art("Articolul 2"))
+            + "</body></html>"
+        ).encode("utf-8")
+        asked = []
+
+        def fetch(url):
+            asked.append(url)
+            return page
+
+        code, _, stderr = self.build(fetch=fetch)
+        self.assertEqual((code, asked), (0, []), stderr)
+        self.assertNotIn("headings", self.out("acts/lege/2009/287/act.json"))
+
+        self.config.write_text(
+            self.config.read_text(encoding="utf-8") + "headings = true" + chr(10) + "headings_min_articles = 2" + chr(10),
+            encoding="utf-8",
+        )
+        code, _, stderr = self.build(fetch=fetch, today=date(2026, 11, 9))
+        self.assertEqual(code, 0, stderr)
+        act = self.out("acts/lege/2009/287/act.json")
+        self.assertEqual(
+            act["headings"],
+            [
+                {"kind": "crt", "label": "Cartea I", "name": "Despre persoane", "depth": 0},
+                {"kind": "cap", "label": "Capitolul I", "name": "Dispoziții generale", "depth": 1},
+                {"kind": "cap", "label": "Capitolul II", "name": "Alt capitol", "depth": 1},
+            ],
+        )
+        self.assertEqual([entry.get("heading") for entry in act["articles"]], [1, 2])
+        # Acts with fewer articles than the minimum are not fetched.
+        self.assertEqual(asked, ["https://example.invalid/287"])
+        self.assertNotIn("headings", self.out("acts/lege/2010/134/act.json"))
+
     def test_dry_run_writes_objects_sql_and_state(self):
         code, stdout, stderr = self.build()
         self.assertEqual((code, stderr), (0, ""), stdout)

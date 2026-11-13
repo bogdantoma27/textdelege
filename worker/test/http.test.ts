@@ -131,13 +131,11 @@ describe("page cache", () => {
     expect((await get("/cauta?q=art.+1+Codul+civil")).status).toBe(302);
   });
 
-  it("stores the home page in a few variants", async () => {
+  it("stores the home page as one entry: the second visit is a hit", async () => {
     const first = await get("/");
     expect(first.status).toBe(200);
     expect(first.headers.get("Cache-Control")).toBe("public, max-age=300, s-maxage=604800");
-    const seen = new Set<string | null>();
-    for (let i = 0; i < 40; i++) seen.add((await get("/")).headers.get("Cache-Status"));
-    expect(seen.has("textdelege; hit")).toBe(true);
+    expect((await get("/")).headers.get("Cache-Status")).toBe("textdelege; hit");
   });
 
   it("keeps the health check out of the cache, and errors too", async () => {

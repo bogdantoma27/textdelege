@@ -15,9 +15,10 @@ import { articleLabel } from "../lib/article-label";
 import { linkCrossReferences, linkableNumbers } from "../lib/text";
 import type { ActArticleEntry, ActObject, ArticleObject, ArticleRuling, LawObject, TimelineEntry } from "../lib/types";
 import { type ArticleRef, actUrl, articleSlugFor, articleUrl, changesUrl, compareUrl, lawUrlFromKey, subscribeUrl } from "../lib/urls";
+import { headingPathIndexes, headingText, headingsBefore, lastHeadingBefore } from "../lib/headings";
 import { resolveView } from "../lib/versions";
 import { Paragraph } from "./article";
-import { CitationPanel, Contents, Freshness, FreshnessWarning } from "./article-rails";
+import { CitationPanel, Contents, Freshness, FreshnessWarning, freshnessIsOk, freshnessLine } from "./article-rails";
 import { Breadcrumbs, DataTable, ErrorSummary, FieldError, Pagination, Panel, Support, Tabs, DatedNote } from "./components";
 import { Indexed } from "./indexed";
 import { Layout, ORIGIN } from "./layout";
@@ -105,6 +106,8 @@ function Header(props: { ctx: ActContext; act: ActObject; actRef: string; tab: A
   }
   facts.push({ label: t("sourceOfficial"), value: <a href={official}>{hostOf(official)}</a> });
 
+  const note = freshnessLine(act);
+
   return (
     <>
       <Breadcrumbs
@@ -128,9 +131,10 @@ function Header(props: { ctx: ActContext; act: ActObject; actRef: string; tab: A
             {fact.label} <b>{fact.value}</b>
           </span>
         ))}
-        <span class="fact">{verified ? t("statusVerified", { date: formatRo(verified) }) : t("statusUnverified")}</span>
+        {verified && freshnessIsOk(act) && <span class="fact">{t("statusVerified", { date: formatRo(verified) })}</span>}
       </div>
       <FreshnessWarning act={act} />
+      {note !== null && <p class="fresh-line">{note}</p>}
       <section class="time compact" aria-label={t("timePanelActLabel")}>
         <form class={ctx.invalid === undefined ? "date-form" : "date-form error"} method="get" action={actUrl(actRef)} novalidate data-filter="">
           <label class="label" for="data">
@@ -296,6 +300,15 @@ function FullText(props: {
   const first = paged.items[0];
   const last = paged.items[paged.items.length - 1];
   const numbers = linkableNumbers(act.articles);
+  const headings = act.headings ?? [];
+  const start = lastHeadingBefore(act, (paged.page - 1) * TEXT_PAGE);
+  let seen = start;
+  const context =
+    first === undefined || headings.length === 0
+      ? []
+      : headingPathIndexes(act, { ...first, heading: first.heading ?? (start >= 0 ? start : undefined) }).filter(
+          (index) => index <= start,
+        );
   return (
     <section aria-labelledby="textul">
       <h2 id="textul">{t("actFullTextHeading")}</h2>
@@ -321,16 +334,31 @@ function FullText(props: {
           />
         </div>
       )}
-      {paged.items.map((entry, index) => (
-        <ArticleBlock
-          ctx={ctx}
-          actRef={actRef}
-          entry={entry}
-          article={text.articles[index] ?? null}
-          numbers={numbers}
-          articles={act.articles}
-        />
-      ))}
+      {context.length > 0 && (
+        <p class="where">{context.map((index) => headingText(headings[index]!)).join(" › ")}</p>
+      )}
+      {paged.items.map((entry, index) => {
+        const starting = headingsBefore(act, entry, seen);
+        seen = Math.max(seen, entry.heading ?? -1);
+        return (
+          <>
+            {starting.map(({ heading }) => (
+              <h3 class={`hd d${heading.depth}`}>
+                <span class="hd-label">{heading.label}</span>
+                {heading.name !== "" && ` ${heading.name}`}
+              </h3>
+            ))}
+            <ArticleBlock
+              ctx={ctx}
+              actRef={actRef}
+              entry={entry}
+              article={text.articles[index] ?? null}
+              numbers={numbers}
+              articles={act.articles}
+            />
+          </>
+        );
+      })}
       <Pages
         paged={paged}
         href={(page) => `${path}?pagina=${page}${filterQuery}`}

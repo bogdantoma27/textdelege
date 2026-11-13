@@ -15,6 +15,7 @@ export type LayoutProps = {
   query?: string;
   script?: string;
   home?: boolean;
+  pageSearch?: boolean;
   toc?: Child;
   rail?: Child;
   cite?: { sentence: string; address: string };
@@ -43,7 +44,7 @@ export const SCRIPTED_SPECULATION_RULES = speculationRules("[rel~=nofollow],[dow
 
 export const ORIGIN = "https://textdelege.ro";
 
-export function SearchForm(props: { query?: string; id: string; class: string }) {
+export function SearchForm(props: { query?: string; id: string; class: string; placeholder?: string }) {
   return (
     <form class={props.class} role="search" action="/cauta" method="get" data-all={t("searchAll")} data-empty={t("searchEmpty")}>
       <label class="vh" for={props.id}>
@@ -55,7 +56,7 @@ export function SearchForm(props: { query?: string; id: string; class: string })
         type="search"
         name="q"
         value={props.query}
-        placeholder={t("searchPlaceholder")}
+        placeholder={props.placeholder ?? t("searchPlaceholder")}
         autocomplete="off"
       />
       <button class="search-button" type="submit">
@@ -255,6 +256,7 @@ function Footer({ compact }: { compact?: boolean }) {
 export function Layout(props: LayoutProps) {
   const { canonical } = props;
   const built = builtDay();
+  const bare = props.home === true || props.pageSearch === true;
   const marks = sectionMarks(new URL(canonical, ORIGIN).pathname, props.toc !== undefined);
   return (
     <>
@@ -282,7 +284,7 @@ export function Layout(props: LayoutProps) {
           <script type="module" src="/site.js" />
           {props.script && <script type="module" src={props.script} />}
         </head>
-        <body class={props.toc !== undefined ? "with-contents" : props.home ? "home" : undefined}>
+        <body class={[props.toc !== undefined ? "with-contents" : props.home ? "home" : "", bare ? "bare-header" : ""].filter(Boolean).join(" ") || undefined}>
           <a class="skip" href="#main">
             {t("skipToContent")}
           </a>
@@ -290,14 +292,16 @@ export function Layout(props: LayoutProps) {
             <div class="wrap">
               <div class="header-bar">
                 <Brand onMast />
-                <SearchForm query={props.query} id="q" class="omni" />
+                {!bare && <SearchForm query={props.query} id="q" class="omni" />}
                 <nav class="nav" aria-label={t("mainNavLabel")}>
                   <NavLinks marks={marks} />
                   <DisplayMenu id="bar" />
                 </nav>
-                <a class="find" href="#cauta">
-                  {t("searchButton")}
-                </a>
+                {!bare && (
+                  <a class="find" href="#cauta">
+                    {t("searchButton")}
+                  </a>
+                )}
                 <details class="menu">
                   <summary>{t("menuLabel")}</summary>
                   <div class="menu-panel">
@@ -310,15 +314,19 @@ export function Layout(props: LayoutProps) {
               </div>
             </div>
           </header>
-          <div class="search-overlay" id="cauta">
-            <a class="scrim" href="#" tabindex={-1} aria-hidden="true" />
-            <div class="sheet">
-              <SearchForm query={props.query} id="q-overlay" class="omni" />
-              <a class="close" href="#">
-                {t("searchClose")}
-              </a>
+          {!bare && (
+            <div class="search-overlay" id="cauta">
+              <a class="scrim" href="#" tabindex={-1} aria-hidden="true" />
+              <div class="sheet">
+                <p class="sheet-title">{t("searchButton")}</p>
+                <a class="close" href="#">
+                  {t("searchClose")}
+                </a>
+                <SearchForm query={props.query} id="q-overlay" class="omni" placeholder={t("searchPlaceholderShort")} />
+                <p class="sheet-hint">{t("searchHint")}</p>
+              </div>
             </div>
-          </div>
+          )}
           <div class="wrap shell" id="page">
             <main id="main" tabindex={-1}>
               {props.children}

@@ -162,10 +162,6 @@ function FilterForm({ page }: { page: ChangesPage }) {
           <label class="label" for="filter-alt">
             {t("changesFilterAlt")}
           </label>
-          <p class="hint" id="filter-alt-hint">
-            {t("changesFilterAltHint")}
-          </p>
-          {page.altInvalid && <FieldError id="filter-alt">{t("changesFilterAltInvalid", { act: page.alt })}</FieldError>}
           <input
             class="field"
             id="filter-alt"
@@ -176,6 +172,10 @@ function FilterForm({ page }: { page: ChangesPage }) {
             autocomplete="off"
             aria-describedby={page.altInvalid ? "filter-alt-hint filter-alt-error" : "filter-alt-hint"}
           />
+          <p class="hint" id="filter-alt-hint">
+            {t("changesFilterAltHint")}
+          </p>
+          {page.altInvalid && <FieldError id="filter-alt">{t("changesFilterAltInvalid", { act: page.alt })}</FieldError>}
         </div>
       )}
       <div class="form-group">

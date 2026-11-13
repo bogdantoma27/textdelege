@@ -22,7 +22,7 @@ import { ArrowDownIcon, ArrowUpIcon, ChevronLeftIcon } from "./icons";
 import { LawLink, VERBS, lawLabels } from "./shared";
 import { Indexed } from "./indexed";
 import { Layout, ORIGIN } from "./layout";
-import { Breadcrumbs, OffLink, Options, Pagination, Panel, SummaryList, Support, Timeline, WarningText } from "./components";
+import { Breadcrumbs, OffLink, Options, Pagination, Panel, Support, Timeline, WarningText } from "./components";
 
 export interface CompareContext {
   now: string;
@@ -358,20 +358,6 @@ function ParallelText(props: {
   );
 }
 
-function VersionInfo(props: { version: ArticleVersion; by: Key }) {
-  const { version } = props;
-  return (
-    <>
-      {rangeText(version.from, version.until)}
-      {version.law && (
-        <span class="by">
-          {t(props.by)} <LawLink lawKey={version.law.key} label={version.law.label} />
-        </span>
-      )}
-    </>
-  );
-}
-
 function titleOf(act: ActObject, file: string): string | null {
   return act.articles.find((entry) => entry.file === file)?.title ?? null;
 }
@@ -600,40 +586,22 @@ export function renderCompare(
           {article.title && ` ${article.title}`}
         </h1>
 
-        <div class="versions" role="group" aria-label={t("cmpVersionsLabel")}>
-          <SummaryList
-            rows={[
-              { label: t("cmpOld"), value: <VersionInfo version={older} by="cmpFormBy" /> },
-              {
-                label: t("cmpNew"),
-                value: (
-                  <VersionInfo
-                    version={newer}
-                    by={toHit.index > fromHit.index ? "cmpModifiedBy" : "cmpFormBy"}
-                  />
-                ),
-              },
-            ]}
-          />
-        </div>
+        <p class="versions" role="group" aria-label={t("cmpVersionsLabel")}>
+          {formatRo(older.from)} → {formatRo(newer.from)}
+          {newer.law && (
+            <>
+              {" · "}
+              {t(toHit.index > fromHit.index ? "cmpModifiedBy" : "cmpFormBy")}{" "}
+              <LawLink lawKey={newer.law.key} label={newer.law.label} />
+            </>
+          )}
+        </p>
 
         <Pick article={article} actRef={actRef} from={older.from} to={newer.from} ctx={ctx} />
 
-        <section class="time" aria-label={t("timePanelLabel")}>
-          <Timeline
-            today={ctx.now}
-            from={older.from}
-            to={newer.from}
-            points={article.versions.map((version) => ({
-              date: version.from,
-              href: articleUrl(actRef, article, version.from),
-              name: version.law?.label ?? "",
-            }))}
-          />
-        </section>
-
         <Options
           legend={t("cmpBarLabel")}
+          hideLegend
           action={path}
           params={ctx.granularity === "char" ? { [FLAGS.chars[0]]: FLAGS.chars[1] } : {}}
           options={[
@@ -698,6 +666,20 @@ export function renderCompare(
             </span>
           </p>
         </div>
+
+        <section class="time" aria-label={t("timePanelLabel")}>
+          <h2>{t("versionsHeading")}</h2>
+          <Timeline
+            today={ctx.now}
+            from={older.from}
+            to={newer.from}
+            points={article.versions.map((version) => ({
+              date: version.from,
+              href: articleUrl(actRef, article, version.from),
+              name: version.law?.label ?? "",
+            }))}
+          />
+        </section>
 
         <SameLaw act={act} actRef={actRef} article={article} to={newer} law={law} />
 

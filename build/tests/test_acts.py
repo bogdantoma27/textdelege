@@ -226,6 +226,13 @@ class ConfigTest(unittest.TestCase):
         cfg = load_config(p, {**env, "F": "tok"})
         self.assertEqual(cfg.d1, D1Config("acc", "db", "tok"))
 
+    def test_headings_are_off_by_default_and_need_twenty_articles(self):
+        cfg = load_config(self.write(""), {})
+        self.assertEqual((cfg.headings, cfg.headings_min_articles), (False, 20))
+        cfg = load_config(self.write("headings = true" + chr(10) + "headings_min_articles = 5" + chr(10)), {})
+        self.assertEqual((cfg.headings, cfg.headings_min_articles), (True, 5))
+
     def test_repo_config_loads(self):
         cfg = load_config(Path(__file__).parents[1] / "config.toml", {})
         self.assertEqual(cfg.selection, "codes")
+        self.assertTrue(cfg.headings)

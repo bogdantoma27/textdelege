@@ -4,6 +4,8 @@ import { tocEntries } from "../lib/act";
 import { articleLabel } from "../lib/article-label";
 import { normalise } from "../lib/citation";
 import { formatRo } from "../lib/dates";
+import { headingsBefore, lastHeadingBefore } from "../lib/headings";
+import { labelFromKey } from "../lib/law-label";
 import type { ActArticleEntry, ActObject, ArticleObject, ArticleState, ArticleVersion } from "../lib/types";
 import { type ArticleRef, actUrl, articleUrl, rulingUrlFromKey, subscribeUrl } from "../lib/urls";
 import { Indexed } from "./indexed";
@@ -112,6 +114,7 @@ export function Contents(props: ContentsProps) {
     shown = shown.slice(start, end);
   }
   const width = Math.max(3, ...shown.map((item) => item.entry.number.length));
+  let seen = filtering || shown.length === 0 ? Infinity : lastHeadingBefore(act, all.indexOf(shown[0]!));
   const close = filtering ? props.path + keep : "#main";
   return (
     <>
@@ -166,7 +169,16 @@ export function Contents(props: ContentsProps) {
             const label = state === "repealed" ? t("stateRepealedShort") : state === "future" ? t("stateFutureShort") : null;
             const excerpt = entry.title === null && entry.lead ? entry.lead : null;
             const text = entry.title ?? excerpt ?? label;
+            const starting = seen === Infinity ? [] : headingsBefore(act, entry, seen);
+            if (seen !== Infinity) seen = Math.max(seen, entry.heading ?? -1);
             return (
+              <>
+                {starting.map(({ heading }) => (
+                  <div class={`toc-sec d${heading.depth}`}>
+                    <span class="l">{heading.label}</span>
+                    {heading.name !== "" && <span class="d">{heading.name}</span>}
+                  </div>
+                ))}
               <a
                 href={articleHref(entry)}
                 class={current ? "cur" : state === "repealed" ? "rep" : state === "future" ? "fut" : undefined}
@@ -181,6 +193,7 @@ export function Contents(props: ContentsProps) {
                 </span>
                 {text && <span class={excerpt === null ? "t" : "t lead"}>{text}</span>}
               </a>
+              </>
             );
           })}
           {after && (
@@ -222,21 +235,23 @@ export function Contents(props: ContentsProps) {
   );
 }
 
-function freshnessOf(act: ActObject): { tone: "ok" | "warn"; text: string } {
+export type FreshnessLevel = "ok" | "note" | "warn";
+
+function freshnessOf(act: ActObject): { level: FreshnessLevel; text: string } {
   const fresh = act.freshness;
   const name = actName(act);
   const of = genitive(name);
   const label = (key: string | null) =>
-    key === null ? null : (act.laws.find((law) => law.key === key)?.label ?? key);
+    key === null ? null : (act.laws.find((law) => law.key === key)?.label ?? labelFromKey(key));
   const verified = fresh?.last_verified ? formatRo(fresh.last_verified) : null;
   const unverified = t("freshUnverified", { act: name });
 
-  let tone: "ok" | "warn" = "warn";
+  let level: FreshnessLevel = "note";
   let text = t("freshUnknown", { act: of });
   switch (fresh?.status) {
     case "current":
       if (verified) {
-        tone = "ok";
+        level = "ok";
         text = t("freshCurrent", { act: name, date: verified });
       } else {
         text = unverified;
@@ -245,6 +260,7 @@ function freshnessOf(act: ActObject): { tone: "ok" | "warn"; text: string } {
     case "pending-change": {
       const change = label(fresh.newest_change);
       if (change === null) break;
+      if (!fresh.change_in_repo) level = "warn";
       text =
         fresh.change_in_repo && fresh.newest_change_date
           ? t("freshPendingScheduled", { change, date: formatRo(fresh.newest_change_date) })
@@ -263,7 +279,7 @@ function freshnessOf(act: ActObject): { tone: "ok" | "warn"; text: string } {
         : t("freshUnavailableNever", { act: name });
       break;
   }
-  return { tone, text };
+  return { level, text };
 }
 
 const PORTAL_HOST = "legislatie.just.ro";
@@ -273,14 +289,23 @@ function withPortalLink(text: string, act: ActObject): Child[] {
 }
 
 export function Freshness({ act }: { act: ActObject }) {
-  const { tone, text } = freshnessOf(act);
+  const { level, text } = freshnessOf(act);
   const body = withPortalLink(text, act);
-  return tone === "ok" ? <p>{body}</p> : <WarningText>{body}</WarningText>;
+  return level === "warn" ? <WarningText>{body}</WarningText> : <p>{body}</p>;
 }
 
 export function FreshnessWarning({ act }: { act: ActObject }) {
-  const { tone, text } = freshnessOf(act);
-  return tone === "ok" ? null : <WarningText class="fresh-note">{withPortalLink(text, act)}</WarningText>;
+  const { level, text } = freshnessOf(act);
+  return level === "warn" ? <WarningText class="fresh-note">{withPortalLink(text, act)}</WarningText> : null;
+}
+
+export function freshnessIsOk(act: ActObject): boolean {
+  return freshnessOf(act).level === "ok";
+}
+
+export function freshnessLine(act: ActObject): Child[] | null {
+  const { level, text } = freshnessOf(act);
+  return level === "note" ? withPortalLink(text, act) : null;
 }
 
 function RulingLink({ rulingKey, label }: { rulingKey: string; label: string }) {
@@ -373,7 +398,7 @@ export function Rail(props: RailProps) {
           </ul>
         </Panel>
       )}
-      <Panel title={t("freshTitle")}>
+      <Panel title={t("freshTitle")} class="fresh-panel">
         <Freshness act={act} />
         {upcoming && (
           <p>

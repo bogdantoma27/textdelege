@@ -98,6 +98,7 @@ export interface Option {
 
 export function Options(props: {
   legend: string;
+  hideLegend?: boolean;
   action: string;
   params?: Record<string, string>;
   options: Option[];
@@ -108,7 +109,7 @@ export function Options(props: {
         <input type="hidden" name={name} value={value} />
       ))}
       <fieldset>
-        <legend>{props.legend}</legend>
+        <legend class={props.hideLegend ? "vh" : undefined}>{props.legend}</legend>
         <div class="checkboxes">
           {props.options.map((option) => (
             <>
@@ -142,9 +143,9 @@ export function Options(props: {
   );
 }
 
-export function Panel({ title, children }: { title: string; children?: Child }) {
+export function Panel({ title, children, class: extra }: { title: string; children?: Child; class?: string }) {
   return (
-    <section class="panel">
+    <section class={extra === undefined ? "panel" : `panel ${extra}`}>
       <h2>{title}</h2>
       {children}
     </section>

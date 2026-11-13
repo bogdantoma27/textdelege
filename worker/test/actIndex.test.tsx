@@ -140,6 +140,8 @@ describe("Alt act field on the changes page", () => {
     const html = await page("/modificari");
     expect(html).toContain('<label class="label" for="filter-alt">Alt act</label>');
     expect(html).toMatch(/<input[^>]*type="text"[^>]*name="alt"/);
+    expect(html.indexOf('name="alt"')).toBeLessThan(html.indexOf('id="filter-alt-hint"'));
+    expect(html).toMatch(/<input[^>]*id="filter-alt"[^>]*aria-describedby="filter-alt-hint"/);
     expect(html).not.toContain("Legea nr. 31/1990</option>");
   });
 

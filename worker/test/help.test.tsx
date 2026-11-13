@@ -51,6 +51,13 @@ describe("help pages", () => {
     for (const code of ["pending-change", "source-unavailable"]) expect(statuses, code).not.toContain(code);
   });
 
+  it("/despre says where the part, title and chapter headings come from", async () => {
+    const html = await page("/despre");
+    expect(html).toContain("titlurile de părți, cărți, titluri, capitole și secțiuni");
+    expect(html).toContain("legislatie.just.ro, în forma actuală a actului");
+    expect(html).not.toContain("cuprinsul este o listă de articole");
+  });
+
   it("/despre lists every unavailable source with its name and date, and no other", async () => {
     const source = (name: string, state: OfficialSource["state"], since: string | null): OfficialSource => ({
       name,

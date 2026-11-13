@@ -108,6 +108,13 @@ export interface Freshness {
   official_url: string | null;
 }
 
+export interface ActHeading {
+  kind: string;
+  label: string;
+  name: string;
+  depth: number;
+}
+
 export interface ActArticleEntry {
   file: string;
   number: string;
@@ -118,6 +125,7 @@ export interface ActArticleEntry {
   changes: number;
   first: string | null;
   last_change: string | null;
+  heading?: number;
 }
 
 export interface TimelineEntry {
@@ -147,6 +155,7 @@ export interface ActObject {
   from: string;
   latest: string;
   freshness: Freshness | null;
+  headings?: ActHeading[];
   articles: ActArticleEntry[];
   timeline: TimelineEntry[];
   stats: ActStats;

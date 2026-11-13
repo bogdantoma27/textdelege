@@ -134,6 +134,7 @@ function filterContents() {
     if (hit) shown++;
   }
   for (const more of list.querySelectorAll(":scope > a.more")) more.hidden = query !== "";
+  for (const heading of list.querySelectorAll(":scope > .toc-sec")) heading.hidden = query !== "";
   list.querySelector(".toc-none")?.remove();
   if (query !== "" && shown === 0) {
     const note = document.createElement("p");

@@ -12,9 +12,10 @@ import type {
 } from "../lib/types";
 import { articleLabel } from "../lib/article-label";
 import { linkableNumbers, unitText } from "../lib/text";
+import { headingPath, headingText } from "../lib/headings";
 import { type View, resolveView } from "../lib/versions";
 import { SOURCE_REPOSITORY, actUrl, articleUrl, compareUrl, sourceFileUrl } from "../lib/urls";
-import { Rail, Contents, FreshnessWarning, citationOf, type RailProps } from "./article-rails";
+import { Rail, Contents, FreshnessWarning, freshnessIsOk, freshnessLine, citationOf, type RailProps } from "./article-rails";
 import {
   Breadcrumbs,
   DataTable,
@@ -114,13 +115,13 @@ export function Paragraph(props: {
           <button
             class="copy"
             type="button"
-            title={t("citeCopyPara")}
+            title={t("citeCopyLink")}
             data-copy={props.copy}
             data-copied={t("citeCopied")}
             data-failed={t("citeCopyFailed")}
           >
             <CopyIcon />
-            <span class="vh">{t("citeCopyPara")}</span>
+            <span class="vh">{t("citeCopyLink")}</span>
           </button>
           <span class="copied" role="status" />
         </>
@@ -231,6 +232,7 @@ export function renderArticle(
     filter: ctx.filter,
   };
   const cite = citationOf(rail);
+  const upcoming = article.versions.find((v) => v.from > ctx.now && v !== version);
 
   const previous = view.kind === "beforeFirst" ? undefined : article.versions[index - 1];
   const compare = previous
@@ -251,6 +253,8 @@ export function renderArticle(
       : []),
   ];
 
+  const entry = act.articles.find((candidate) => candidate.file === article.file);
+  const where = entry === undefined ? [] : headingPath(act, entry);
   const heading = articleLabel(article, act.articles);
   const title = `${heading} ${name}`;
   const description = article.title ? `${title}: ${article.title}` : title;
@@ -276,25 +280,23 @@ export function renderArticle(
         />
         <div class="head">
           <div>
+            {where.length > 0 && <p class="where">{where.map(headingText).join(" › ")}</p>}
             <h1>
               <Indexed text={heading} />
               {article.title && <span class="ttl">{article.title}</span>}
             </h1>
             {showsText && <StatusRow view={view} {...{ act, article, ctx }} />}
           </div>
-          {options.length > 0 && (
-            <Options
-              legend={t("togglesLabel")}
-              action={path}
-              params={ctx.filter === "" ? {} : { cuprins: ctx.filter }}
-              options={options}
-            />
-          )}
         </div>
-        <FreshnessWarning act={act} />
         <Notices view={view} {...{ article, date, onDate }} />
+        <FreshnessWarning act={act} />
+        {upcoming && (
+          <p class="fresh-line next-version">
+            <a href={onDate(upcoming.from)}>{t("freshNextVersion", { date: formatRo(upcoming.from) })}</a>
+          </p>
+        )}
 
-        <section class="time" aria-label={t("timePanelLabel")}>
+        <div class="tools">
           <p class="compare-links">
             {article.versions.length > 1 ? (
               <a href={compare}>{t(toCurrent === compare ? "compareWithCurrent" : "compareVersions")}</a>
@@ -305,17 +307,16 @@ export function renderArticle(
               <a href={toCurrent}>{t("compareWithCurrent")}</a>
             )}
           </p>
-          <Timeline
-            today={ctx.now}
-            pick
-            current={showsText ? version.from : undefined}
-            points={article.versions.map((v) => ({
-              date: v.from,
-              href: onDate(v.from),
-              name: v.law?.label ?? "",
-            }))}
-          />
-        </section>
+          {options.length > 0 && (
+            <Options
+              legend={t("togglesLabel")}
+              hideLegend
+              action={path}
+              params={ctx.filter === "" ? {} : { cuprins: ctx.filter }}
+              options={options}
+            />
+          )}
+        </div>
 
         {showsText && (
           <>
@@ -330,8 +331,30 @@ export function renderArticle(
               attribution={attributed}
               changeHref={previous ? compareUrl(actRef, article, previous.from, version.from) : undefined}
             />
-            <SourceLine act={act} article={article} version={version} address={`${ORIGIN}${articleUrl(actRef, article, version.from)}`} />
+            <SourceLine
+              act={act}
+              article={article}
+              version={version}
+              address={`${ORIGIN}${articleUrl(actRef, article, version.from)}`}
+              note={freshnessLine(act)}
+            />
           </>
+        )}
+
+        {article.versions.length > 1 && (
+          <section class="time" aria-label={t("timePanelLabel")}>
+            <h2>{t("versionsHeading")}</h2>
+            <Timeline
+              today={ctx.now}
+              pick
+              current={showsText ? version.from : undefined}
+              points={article.versions.map((v) => ({
+                date: v.from,
+                href: onDate(v.from),
+                name: v.law?.label ?? "",
+              }))}
+            />
+          </section>
         )}
 
         <History
@@ -391,9 +414,7 @@ function StatusRow(props: { view: View; act: ActObject; article: ArticleObject; 
     <div class="status">
       {badge}
       {validity !== "" && <span>{validity}</span>}
-      <span class="fact">
-        {verified ? t("statusVerified", { date: formatRo(verified) }) : t("statusUnverified")}
-      </span>
+      {verified && freshnessIsOk(act) && <span class="fact">{t("statusVerified", { date: formatRo(verified) })}</span>}
     </div>
   );
 }
@@ -450,12 +471,7 @@ function LawText(props: {
   const numbers = linkableNumbers(act.articles);
   const linked = (body: string) => linkCrossReferences(body, { actRef, date, articles: numbers });
   const permanent = `${ORIGIN}${articleUrl(actRef, article, version.from)}`;
-  const copyText = (line: ArticleLine) =>
-    `${t("citeParagraph", {
-      ref: `${articleLabel(article, act.articles)} ${unitText(line.id)}`,
-      act: act.short ?? act.title,
-      date: formatRo(date ?? props.now),
-    })}, ${permanent}#${line.id}`;
+  const copyText = (line: ArticleLine) => `${permanent}#${line.id}`;
   return (
     <div class="law" lang="ro">
       {version.lines.map((line) => (
@@ -480,6 +496,7 @@ function SourceLine(props: {
   article: ArticleObject;
   version: ArticleVersion;
   address: string;
+  note?: Child[] | null;
 }) {
   const { act, article, version } = props;
   let host = act.portal;
@@ -511,6 +528,7 @@ function SourceLine(props: {
           <a href={`${SOURCE_REPOSITORY}/issues/new?${issue.toString()}`}>{t("reportIssue")}</a>
         </span>
       </p>
+      {props.note && <p class="fresh-line">{props.note}</p>}
     </div>
   );
 }

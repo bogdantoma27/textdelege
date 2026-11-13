@@ -2,7 +2,7 @@ import { t, tPlural } from "../text";
 import type { ActList, ActListItem } from "../lib/store";
 import { parseActStatus } from "../lib/status";
 import { actUrl } from "../lib/urls";
-import { Breadcrumbs, ErrorSummary, FieldError, Inset, PageNumbers } from "./components";
+import { Breadcrumbs, ErrorSummary, FieldError, PageNumbers } from "./components";
 import { Layout, ORIGIN } from "./layout";
 import { KINDS, StatusBadge, grouped, kindPlural } from "./shared";
 
@@ -150,7 +150,6 @@ export function renderActs(query: ActsQuery, list: ActList) {
         <Breadcrumbs items={[{ href: "/", label: t("breadcrumbHome") }]} current={heading} />
         {refused && <ErrorSummary items={[{ href: "#acte-an", text: t("actsYearInvalid") }]} />}
         <h1>{heading}</h1>
-        <Inset>{t("actsIntro")}</Inset>
         <FilterForm query={query} />
         {!refused && list.items.length === 0 && <p>{t("actsNone")}</p>}
         {!refused && list.items.length > 0 && (

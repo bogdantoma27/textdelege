@@ -13,6 +13,7 @@ import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 from build.tests.sourcerepo import SourceRepo
+from build.tests.test_structure import art, unit
 from build.textdelege import cli
 
 tmp = Path(sys.argv[1])
@@ -21,13 +22,27 @@ cache = tmp / "work" / ".cache"
 config = tmp / "work" / "config.toml"
 config.parent.mkdir()
 config.write_text(
-    f'source_url = "{source.uri}"\nselection = "codes"\ncache_dir = ".cache"\n',
+    f'source_url = "{source.uri}"\nselection = "codes"\ncache_dir = ".cache"\n'
+    "headings = true\nheadings_min_articles = 2\n",
     encoding="utf-8",
 )
+PAGE = (
+    "<html><body>"
+    + unit(
+        "CRT", "Cartea I", "Despre persoane",
+        unit(
+            "TTL", "Titlul I", "Dispoziții generale",
+            unit("CAP", "Capitolul I", "Aplicarea legii", art("Articolul 1"))
+            + unit("CAP", "Capitolul II", "Interpretarea legii", art("Articolul 2")),
+        ),
+    )
+    + "</body></html>"
+).encode("utf-8")
 code = cli.main(
     ["build", "--config", str(config), "--dry-run", "--sample", "3"],
     today=date(2026, 11, 8),
     now=datetime(2026, 11, 8, 6, 0, 0, tzinfo=timezone.utc),
+    fetch=lambda url: PAGE if url.endswith("/287") else None,
 )
 sys.exit(code)
 `;

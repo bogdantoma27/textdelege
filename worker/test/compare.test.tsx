@@ -64,17 +64,14 @@ function markup(): ArticleObject {
 }
 
 describe("article comparison page", () => {
-  it("renders both versions as a summary list, the stats bar, the legend and links to both versions in the repo", async () => {
+  it("renders both versions on one line, the stats bar, the legend and links to both versions in the repo", async () => {
     const response = await get(ONE);
     expect(response.status).toBe(200);
     const html = await response.text();
-    expect(html).toContain(
-      '<dt class="summary-key">Versiunea veche</dt><dd class="summary-value">01.10.2011 → 08.07.2023<span class="by">Forma dată de <a href="/lege/2011/71">',
+    expect(html).toMatch(
+      /<p class="versions" role="group" aria-label="[^"]+">01\.10\.2011 → 09\.07\.2023 · Modificată prin <a href="\/lege\/2023\/200">Legea nr\. 200\/2023<\/a><\/p>/,
     );
-    expect(html).toContain(
-      '<dt class="summary-key">Versiunea nouă</dt><dd class="summary-value">09.07.2023 → prezent<span class="by">Modificată prin <a href="/lege/2023/200">',
-    );
-    expect(html).toContain('<a href="/lege/2011/71">Legea nr. 71/2011</a>');
+    expect(html).not.toContain("summary-key");
     expect(html).toContain('<a href="/lege/2023/200">Legea nr. 200/2023</a>');
     expect(html).toContain('<span class="cnt">1 schimbare</span> în alin. (1) · alin. (2) neschimbat');
     expect(html).toContain("<ins>");
@@ -154,7 +151,7 @@ describe("article comparison page", () => {
     const form = html.slice(start, html.indexOf("</form>", start));
     expect(form).toContain(`method="get" action="${ONE}"`);
     expect(form).toContain('<input type="hidden" name="granularitate" value="caractere"');
-    expect(form).toContain('<legend>Opțiuni de comparație</legend>');
+    expect(form).toContain('<legend class="vh">Opțiuni de comparație</legend>');
     expect(form).toMatch(/<input id="optiune-doar" type="checkbox" name="doar" value="diferente" checked=""/);
     expect(form).toMatch(/<input id="optiune-paleta" type="checkbox" name="paleta" value="daltonism" checked=""/);
     expect(form).toMatch(/<div class="checkbox wide-only"><input id="optiune-vedere" type="checkbox" name="vedere" value="paralel" data-param/);
@@ -255,7 +252,11 @@ describe("article comparison page", () => {
     expect(html).toContain('<form class="pick" data-filter="" method="get" action="/codul-civil/art-1/compara"><fieldset><legend>Alege versiunile</legend>');
     const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
     expect(main.indexOf('class="pick"')).toBeGreaterThan(-1);
-    expect(main.indexOf('class="pick"')).toBeLessThan(main.indexOf('class="time"'));
+    expect(main.indexOf('class="pick"')).toBeLessThan(main.indexOf('<form class="options inline"'));
+    expect(main.indexOf('<form class="options inline"')).toBeLessThan(main.indexOf('class="dbar"'));
+    expect(main.indexOf('class="dbar"')).toBeLessThan(main.indexOf('class="time"'));
+    expect(main.indexOf('class="src"')).toBeLessThan(main.indexOf('class="time"'));
+    expect(main).toContain("<h2>Versiuni</h2>");
     expect(html.slice(html.indexOf('<aside class="rail">'))).not.toContain('class="pick"');
     expect(html).toContain('action="/codul-civil/art-1/compara"');
     expect(html).toContain('<select class="field" id="de" name="de">');
