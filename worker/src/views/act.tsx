@@ -22,7 +22,8 @@ import { CitationPanel, Contents, Freshness, FreshnessWarning, freshnessIsOk, fr
 import { Breadcrumbs, DataTable, ErrorSummary, FieldError, Pagination, Panel, Support, Tabs, DatedNote } from "./components";
 import { Indexed } from "./indexed";
 import { Layout, ORIGIN } from "./layout";
-import { LawLink, STATE_BADGE_ID, STATE_LABEL, StatusBadge, lawLabelText, outcomeText, type BadgeId } from "./shared";
+import { parseActStatus } from "../lib/status";
+import { BADGES, LawLink, STATE_BADGE_ID, STATE_LABEL, StatusBadge, lawLabelText, outcomeText, type BadgeId } from "./shared";
 import type { ActNames } from "./changes";
 import { ChangesMade } from "./law";
 
@@ -92,8 +93,17 @@ function Header(props: { ctx: ActContext; act: ActObject; actRef: string; tab: A
   const official = act.freshness?.official_url ?? act.portal;
   const verified = act.freshness?.last_verified;
 
-  const inForce = state === "in-force";
-  const status = inForce ? t("homeInForceFrom", { date: formatRo(act.from) }) : t(STATE_LABEL[state]);
+  const sourceKind = parseActStatus(act.status).kind;
+  const special: BadgeId | null =
+    state === "in-force" && (sourceKind === "amending" || sourceKind === "unchecked") ? sourceKind : null;
+  const inForce = state === "in-force" && special === null;
+  const badgeId: BadgeId = special ?? STATE_BADGE_ID[state];
+  const status =
+    special !== null
+      ? t(BADGES[special].label)
+      : inForce
+        ? t("homeInForceFrom", { date: formatRo(act.from) })
+        : t(STATE_LABEL[state]);
   const facts: { label: string; value: Child }[] = [
     ...(inForce ? [] : [{ label: t("metaInForceFrom"), value: formatRo(act.from) }]),
     { label: t("metaLatest"), value: <a href={changesUrl(actRef)}>{formatRo(act.latest)}</a> },
@@ -125,7 +135,7 @@ function Header(props: { ctx: ActContext; act: ActObject; actRef: string; tab: A
       <p class="caption">{kind === undefined ? identifier : `${t(kind)} ${identifier}`}</p>
       <h1>{actName(act)}</h1>
       <div class="status">
-        <StatusBadge id={STATE_BADGE_ID[state]}>{status}</StatusBadge>
+        <StatusBadge id={badgeId}>{status}</StatusBadge>
         {facts.map((fact) => (
           <span class="fact">
             {fact.label} <b>{fact.value}</b>

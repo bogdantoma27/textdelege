@@ -385,6 +385,20 @@ describe("contents", () => {
     expect(options(view("text", {}, repealed)).map(([value]) => value)).toContain("2023-07-09");
   });
 
+  it("names amending acts and as-published acts in the status badge, with the start date as a fact", () => {
+    for (const [status, label, colour] of [
+      ["amending act", "Act de modificare", "grey"],
+      ["as published, amendments not yet checked", "Text inițial", "yellow"],
+    ] as const) {
+      const act = structuredClone(codul);
+      act.status = status;
+      const html = view("text", {}, act);
+      expect(html, status).toContain(`<strong class="badge badge-${colour}">${label}</strong>`);
+      expect(html, status).toContain('<span class="fact">În vigoare din <b>01.10.2011</b></span>');
+      expect(html, status).not.toContain("badge-green");
+    }
+  });
+
   it("shows a muted line under the status row when the act may be out of date, and a box only for a missing amendment", () => {
     const stale = structuredClone(codul);
     stale.freshness = { ...stale.freshness!, status: "stale" };
