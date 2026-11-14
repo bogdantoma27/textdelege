@@ -34,6 +34,8 @@ function StatusCell({ status }: { status: string }) {
   if (kind === "in-force") return <StatusBadge id="inForce" />;
   if (kind === "repealed") return <StatusBadge id="repealed" />;
   if (kind === "unconsolidated") return <StatusBadge id="unconsolidated" />;
+  if (kind === "amending") return <StatusBadge id="amending" />;
+  if (kind === "unchecked") return <StatusBadge id="unchecked" />;
   return <StatusBadge id="notInForce" />;
 }
 

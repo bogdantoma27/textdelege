@@ -19,6 +19,11 @@ describe("parseActStatus", () => {
     expect(parseActStatus("amended, not consolidated")).toEqual({ kind: "unconsolidated", repealedOn: null });
   });
 
+  it("reads amending acts and acts not checked for amendments", () => {
+    expect(parseActStatus("amending act")).toEqual({ kind: "amending", repealedOn: null });
+    expect(parseActStatus("as published, amendments not yet checked")).toEqual({ kind: "unchecked", repealedOn: null });
+  });
+
   it("treats anything else as other", () => {
     expect(parseActStatus("in-force")).toEqual({ kind: "other", repealedOn: null });
     expect(parseActStatus("repealed 2013-2-15")).toEqual({ kind: "other", repealedOn: null });

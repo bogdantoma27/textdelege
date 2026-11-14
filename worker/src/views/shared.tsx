@@ -33,6 +33,8 @@ export const BADGES = {
   applied: { colour: "green", label: "histApplied", legend: "legendStateApplied" },
   pending: { colour: "yellow", label: "histPending", legend: "legendStatePending" },
   unconsolidated: { colour: "yellow", label: "homeUnconsolidated", legend: "legendStateUnconsolidated" },
+  amending: { colour: "grey", label: "homeAmending", legend: "legendStateAmending" },
+  unchecked: { colour: "yellow", label: "homeUnchecked", legend: "legendStateUnchecked" },
   notInForce: { colour: "grey", label: "homeNotInForce", legend: "legendStateNotInForce" },
   pitInForce: { colour: "green", label: "pitBadgeInForce", legend: "legendStatePitInForce", dated: true },
   pitFuture: { colour: "yellow", label: "pitBadgeFuture", legend: "legendStatePitFuture", dated: true },

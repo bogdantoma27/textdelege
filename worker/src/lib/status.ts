@@ -1,4 +1,4 @@
-export type ActStatusKind = "in-force" | "repealed" | "unconsolidated" | "other";
+export type ActStatusKind = "in-force" | "repealed" | "unconsolidated" | "amending" | "unchecked" | "other";
 
 export interface ActStatus {
   kind: ActStatusKind;
@@ -11,5 +11,7 @@ export function parseActStatus(status: string): ActStatus {
   const repealed = /^repealed (\d{4}-\d{2}-\d{2})$/.exec(status);
   if (repealed) return { kind: "repealed", repealedOn: repealed[1]! };
   if (status === "amended, not consolidated") return { kind: "unconsolidated", repealedOn: null };
+  if (status === "amending act") return { kind: "amending", repealedOn: null };
+  if (status === "as published, amendments not yet checked") return { kind: "unchecked", repealedOn: null };
   return { kind: "other", repealedOn: null };
 }
