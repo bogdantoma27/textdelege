@@ -7,6 +7,7 @@ import type { AppEnv } from "../lib/store";
 import { actUrl, lawKeyFromActRef, parsePath } from "../lib/urls";
 import { actNames } from "../views/changes";
 import { type ActTab, renderAct } from "../views/act";
+import { changesToOthers } from "../views/law";
 import { Contents } from "../views/article-rails";
 
 const TAB_OF: Record<string, ActTab> = {
@@ -93,8 +94,9 @@ actRoutes.get("*", async (c, next) => {
     text = { paged, articles };
   }
   const key = tab === "text" && (ctx.page ?? 1) === 1 ? lawKeyFromActRef(act.path) : null;
-  const law = key === null ? null : await store.law(key);
-  const made = law === null ? undefined : { law, names: actNames(await store.actIndex()) };
+  const stored = key === null ? null : await store.law(key);
+  const law = stored === null ? null : changesToOthers(stored);
+  const made = law === null || law.changes.length === 0 ? undefined : { law, names: actNames(await store.actIndex()) };
   const rulings = tab === "jurisprudenta" ? await store.actRulings(act.path) : undefined;
   return c.html(renderAct(ctx, act, tab, text, rulings, made), invalid === undefined ? 200 : 400);
 });

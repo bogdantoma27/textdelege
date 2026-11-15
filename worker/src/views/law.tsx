@@ -5,7 +5,7 @@ import { dayBefore, formatRo } from "../lib/dates";
 import { unitText } from "../lib/text";
 import { paginate } from "../lib/act";
 import type { EventVerb, LawChange, LawObject } from "../lib/types";
-import { actUrl, articleUrl, compareUrl, lawUrlFromKey } from "../lib/urls";
+import { actUrl, articleUrl, compareUrl, lawKeyFromActRef, lawUrlFromKey } from "../lib/urls";
 import { CitationPanel } from "./article-rails";
 import type { ActNames } from "./changes";
 import { Breadcrumbs, DataTable, PageNumbers, Panel, SummaryList, Support } from "./components";
@@ -14,6 +14,12 @@ import { Layout, ORIGIN } from "./layout";
 import { VERBS, grouped } from "./shared";
 
 const LAW_PAGE = 100;
+
+/** The law's changes to other acts: an act coming into force is not a change it made to itself. */
+export function changesToOthers(law: LawObject): LawObject {
+  const changes = law.changes.filter((change) => lawKeyFromActRef(change.act_path) !== law.key);
+  return changes.length === law.changes.length ? law : { ...law, changes };
+}
 
 export interface ChangeGroup {
   ref: string;
@@ -121,7 +127,8 @@ export function ChangesMade(props: {
   requested: number;
   pageHref: ((page: number) => string) | null;
 }) {
-  const { law, names } = props;
+  const { names } = props;
+  const law = changesToOthers(props.law);
   const paged = paginate(law.changes, props.requested, LAW_PAGE);
   const groups = groupChanges(paged.items, names);
   const summary = summarize(law.changes);
@@ -184,7 +191,8 @@ export function ChangesMade(props: {
   );
 }
 
-export function renderLaw(law: LawObject, names: ActNames, requested: number) {
+export function renderLaw(whole: LawObject, names: ActNames, requested: number) {
+  const law = changesToOthers(whole);
   const paged = paginate(law.changes, requested, LAW_PAGE);
   const path = lawUrlFromKey(law.key) ?? "/";
   const pageHref = (n: number) => `${path}${n > 1 ? `?pagina=${n}` : ""}`;

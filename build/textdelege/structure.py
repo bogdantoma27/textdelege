@@ -24,6 +24,10 @@ USER_AGENT = "textdelege/1 (+https://textdelege.ro/despre)"
 TIMEOUT = 30
 ATTEMPTS = 2
 BREAKER_LIMIT = 3
+# The portal answers 500 (or 404) for a few broken pages while it serves the rest; such an
+# answer stops the fetching only when it comes for many pages in a row.
+PAGE_ERRORS = (404, 410, 500)
+PAGE_LIMIT = 20
 REMOTE_PREFIX = "build-cache/structure/"
 REMOTE_TYPE = "application/gzip"
 PAUSE = 2.0
@@ -178,26 +182,34 @@ def fetch_page(url: str) -> bytes | None:
 class Breaker:
     """Per-build state: stops fetching after a run of failures and counts what was kept."""
 
-    def __init__(self, limit: int = BREAKER_LIMIT) -> None:
+    def __init__(self, limit: int = BREAKER_LIMIT, page_limit: int = PAGE_LIMIT) -> None:
         self.limit = limit
+        self.page_limit = page_limit
         self.failures = 0
+        self.page_failures = 0
         self.stopped = False
         self.kept = 0
         self.none = 0
 
-    def failed(self) -> None:
+    def failed(self, error: Exception | None = None) -> None:
+        if isinstance(error, urllib.error.HTTPError) and error.code in PAGE_ERRORS:
+            self.page_failures += 1
+            if self.page_failures >= self.page_limit:
+                self.stopped = True
+            return
         self.failures += 1
         if self.failures >= self.limit:
             self.stopped = True
 
     def succeeded(self) -> None:
         self.failures = 0
+        self.page_failures = 0
 
     def summary(self) -> str | None:
         if not self.stopped:
             return None
         return (
-            f"headings: fetching stopped after {self.limit} failures in a row; "
+            f"headings: fetching stopped after {self.limit if self.failures >= self.limit else self.page_limit} failures in a row; "
             f"{self.kept} acts kept cached headings, {self.none} acts have none"
         )
 
@@ -304,7 +316,7 @@ def load(
         except Exception as caught:
             error = caught
             if breaker is not None:
-                breaker.failed()
+                breaker.failed(caught)
         else:
             if breaker is not None:
                 breaker.succeeded()

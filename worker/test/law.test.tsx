@@ -157,6 +157,28 @@ describe("amending act page", () => {
       expect(await page("/lege/2011/71?pagina=abc")).toContain("Modificările 1–100 din 250");
     });
 
+    it("does not count the law coming into force as a change it made to itself", async () => {
+      await patchLaw((law) => {
+        law.changes.push({ act_path: "lege/2011/71", file: "art-0001", number: "1", verb: "entered", units: [], date: "2011-10-01" });
+      });
+      const html = await page("/lege/2011/71");
+      expect(html).toContain("A modificat 3 articole în 2 acte.");
+      expect(html).not.toContain('href="/lege/2011/71/art-1');
+    });
+
+    it("leaves the section out of an act page when the act only came into force itself", async () => {
+      const law = structuredClone((await createStore(env).law("legea-71-2011"))!);
+      const own = { act_path: "lege/2009/287", file: "art-0001", number: "1", verb: "entered" as const, units: [], date: "2011-10-01" };
+      restores.push(await replaceObject("laws/legea-287-2009.json", { ...law, key: "legea-287-2009", changes: [own] }));
+      expect(await page("/lege/2009/287")).not.toContain("Modificări aduse");
+
+      const other = { ...own, act_path: "lege/2010/134" };
+      restores.push(await replaceObject("laws/legea-287-2009.json", { ...law, key: "legea-287-2009", changes: [own, other] }));
+      const html = await page("/lege/2009/287");
+      expect(html).toContain("Modificări aduse");
+      expect(html).toContain("A modificat 1 articol în 1 act.");
+    });
+
     it("shows one effective date plainly and several as a range with the full list", async () => {
       await patchLaw((law) => {
         law.in_force = ["2011-10-01"];

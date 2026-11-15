@@ -359,6 +359,31 @@ class RemoteCacheTest(unittest.TestCase):
             "headings: fetching stopped after 3 failures in a row; 0 acts kept cached headings, 8 acts have none",
         )
 
+    def test_broken_pages_do_not_stop_the_fetching_unless_many_come_in_a_row(self):
+        import urllib.error
+
+        breaker = Breaker()
+        calls = []
+
+        def broken_page(url):
+            calls.append(url)
+            raise urllib.error.HTTPError(url, 500, "Internal Server Error", None, None)
+
+        def meta(n):
+            return SimpleNamespace(path=f"lege/2001/{n}", portal=f"https://example.invalid/p{n}")
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            for n in range(1, 5):
+                load(meta(n), "2023-07-09", self.cache, broken_page, breaker=breaker)
+            self.assertFalse(breaker.stopped)
+            self.assertIsNotNone(load(meta(5), "2023-07-09", self.cache, self.fetch, breaker=breaker))
+            self.assertEqual(breaker.page_failures, 0)
+            for n in range(6, 40):
+                load(meta(n), "2023-07-09", self.cache, broken_page, breaker=breaker)
+        self.assertTrue(breaker.stopped)
+        self.assertEqual(len(calls), 4 + breaker.page_limit)
+        self.assertIn(f"stopped after {breaker.page_limit} failures in a row", breaker.summary())
+
     def test_a_stopped_breaker_still_serves_cached_headings_without_fetching(self):
         breaker = Breaker()
         breaker.stopped = True
