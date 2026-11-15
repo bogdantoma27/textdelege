@@ -15,7 +15,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import extractcache, historyindex, structure as structure_module
+from . import cacheseed, extractcache, historyindex, structure as structure_module
 from .acts import ActMeta, old_folder_for, select_acts
 from .config import Config, load_config
 from .d1 import D1BudgetExceeded, SCHEMA_VERSION, D1Client, D1Error, D1QuotaExceeded
@@ -293,6 +293,10 @@ def extract_source(
                 if loaded is not None:
                     cached[meta.path] = loaded
     todo = [meta for meta in metas if meta.path not in cached]
+    if use_cache and r2 is not None:
+        seeded = cacheseed.seed(config.cache_dir, sorted(cached), r2)
+        if seeded:
+            print(f"Cache: copied {seeded:,} extract cache entries to R2")
     if max_new_acts is not None and len(todo) > max_new_acts:
         raise PipelineError(
             f"{len(todo):,} acts need extracting, more than --max-new-acts {max_new_acts:,}: "

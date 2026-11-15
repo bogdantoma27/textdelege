@@ -9,7 +9,7 @@ from unittest import mock
 from build.tests.fixture import FixtureRepo
 from build.tests.sourcerepo import CIVIL, PROCEDURE, SourceRepo, pin_reader
 from build.tests.test_cli import TODAY, run
-from build.textdelege import cli, extractcache
+from build.textdelege import cacheseed, cli, extractcache
 from build.textdelege.extract import (
     Article,
     Line,
@@ -372,6 +372,18 @@ class IncrementalBuildTest(unittest.TestCase):
         code, stdout, stderr, calls = self.run_build("--dry-run", config=config)
         self.assertEqual((code, stderr, len(calls)), (0, "", 2), stdout)
         self.assertEqual(resumed, self.outputs(cache))
+
+    def test_entries_from_a_dry_run_reach_r2_on_the_next_real_build_once(self):
+        code, _stdout, stderr, calls = self.run_build("--dry-run")
+        self.assertEqual((code, stderr, len(calls)), (0, "", 2))
+        r2, d1 = RecordingR2(), RecordingD1()
+        code, stdout, stderr, calls = self.run_build(r2=r2, d1=d1)
+        self.assertEqual((code, stderr, calls), (0, "", []))
+        self.assertIn("Cache: copied 2 extract cache entries to R2", stdout)
+        self.assertEqual(len([k for k in r2.puts if k.startswith(extractcache.REMOTE_PREFIX)]), 2)
+
+        paths = [key[len(extractcache.REMOTE_PREFIX):-len(".json.gz")].replace("_", "/") for key in r2.puts if key.startswith(extractcache.REMOTE_PREFIX)]
+        self.assertEqual(cacheseed.seed(self.cache, paths, r2), 0)
 
     def test_too_many_new_acts_stop_the_build_before_extracting(self):
         r2, d1 = RecordingR2(), RecordingD1()
