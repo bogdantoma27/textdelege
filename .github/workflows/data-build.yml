@@ -30,7 +30,7 @@ jobs:
           restore-keys: |
             build-cache-${{ runner.os }}-
       - name: Run the build
-        run: python -m build.textdelege.cli build --time-budget 300 --max-new-acts 2000 --max-uploads 20000
+        run: python -m build.textdelege.cli build --time-budget 300 --max-new-acts 1000 --max-uploads 5000
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
