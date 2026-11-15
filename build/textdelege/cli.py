@@ -215,6 +215,7 @@ def extract_source(
     deadline: float | None = None,
     workers: int = 1,
     r2=None,
+    max_new_acts: int | None = None,
 ) -> Extracted:
     fetch_started = time.monotonic()
     head = repo.head()
@@ -292,6 +293,11 @@ def extract_source(
                 if loaded is not None:
                     cached[meta.path] = loaded
     todo = [meta for meta in metas if meta.path not in cached]
+    if max_new_acts is not None and len(todo) > max_new_acts:
+        raise PipelineError(
+            f"{len(todo):,} acts need extracting, more than --max-new-acts {max_new_acts:,}: "
+            f"publish this batch from the PC (build/local-build.ps1)"
+        )
 
     def work(meta: ActMeta):
         if deadline is not None and time.monotonic() >= deadline:
@@ -598,6 +604,7 @@ def cmd_build(args, *, today, now, oracle, r2, d1, fetch=None) -> int:
     data = extract_source(
         repo, config, today, use_cache=True, workers=workers, r2=r2,
         deadline=None if budget is None else started + budget * 60,
+        max_new_acts=args.max_new_acts,
     )
     verify_started = time.monotonic()
     samples, mismatches, _seed, skipped = run_checks(repo, data, args.sample, args.seed, today, oracle)
@@ -664,7 +671,7 @@ def cmd_build(args, *, today, now, oracle, r2, d1, fetch=None) -> int:
         write_dry_run(config.cache_dir, objects, rows, manifest, new_state)
     else:
         try:
-            build_id = publish(objects, rows, manifest, new_state, r2, d1)
+            build_id = publish(objects, rows, manifest, new_state, r2, d1, max_uploads=args.max_uploads)
         except D1BudgetExceeded as error:
             print(f"error: {error}", file=sys.stderr)
             finish(True, state.get("build", "") if state else "", BUDGET_NOTE)
@@ -738,6 +745,9 @@ def parser() -> argparse.ArgumentParser:
             sub.add_argument("--dry-run", action="store_true")
             sub.add_argument("--time-budget", type=float, default=None)
             sub.add_argument("--workers", type=int, default=None)
+            # The daily GitHub build sets these so a large batch is left to the PC.
+            sub.add_argument("--max-new-acts", type=int, default=None)
+            sub.add_argument("--max-uploads", type=int, default=None)
     return root
 
 

@@ -247,6 +247,7 @@ def publish(
     state: dict[str, str],
     r2: R2Client,
     d1: D1Client,
+    max_uploads: int | None = None,
 ) -> str:
     previous = read_snapshot(r2)
     fresh = previous is None
@@ -260,6 +261,12 @@ def publish(
     object_hashes = {key: digest(obj) for key, obj in new_objects.items()}
     to_put = [key for key in sorted(object_hashes) if snapshot["objects"].get(key) != object_hashes[key]]
     to_delete = sorted(set(snapshot["objects"]) - set(object_hashes))
+    if max_uploads is not None and len(to_put) > max_uploads:
+        # Checked before anything is written, so nothing is uploaded twice.
+        raise PublishError(
+            f"{len(to_put):,} objects to upload, more than --max-uploads {max_uploads:,}: "
+            f"publish this batch from the PC (build/local-build.ps1)"
+        )
 
     units = units_of(rows)
     unit_hashes = {table: {key: digest(items) for key, items in units[table].items()} for table in TABLES}

@@ -373,6 +373,27 @@ class IncrementalBuildTest(unittest.TestCase):
         self.assertEqual((code, stderr, len(calls)), (0, "", 2), stdout)
         self.assertEqual(resumed, self.outputs(cache))
 
+    def test_too_many_new_acts_stop_the_build_before_extracting(self):
+        r2, d1 = RecordingR2(), RecordingD1()
+        code, _stdout, stderr, calls = self.run_build("--max-new-acts", "1", r2=r2, d1=d1)
+        self.assertEqual((code, calls), (2, []))
+        self.assertIn("--max-new-acts 1", stderr)
+        self.assertTrue(all(key.startswith("build-cache/") for key in r2.puts))
+        self.assertEqual(d1.batches, [])
+        code, _stdout, stderr, calls = self.run_build("--max-new-acts", "2", r2=r2, d1=d1)
+        self.assertEqual((code, stderr, len(calls)), (0, "", 2))
+
+    def test_too_many_uploads_stop_the_publish_before_anything_is_written(self):
+        r2, d1 = RecordingR2(), RecordingD1()
+        code, _stdout, stderr, _calls = self.run_build("--max-uploads", "1", r2=r2, d1=d1)
+        self.assertEqual(code, 2)
+        self.assertIn("--max-uploads 1", stderr)
+        self.assertTrue(all(key.startswith("build-cache/") for key in r2.puts))
+        self.assertEqual(d1.batches, [])
+        code, _stdout, stderr, calls = self.run_build(r2=r2, d1=d1)
+        self.assertEqual((code, stderr, calls), (0, "", []))
+        self.assertTrue(any(not key.startswith("build-cache/") for key in r2.puts))
+
     def test_config_time_budget_applies(self):
         self.config.write_text(
             self.config.read_text(encoding="utf-8") + "time_budget_minutes = 0\n", encoding="utf-8"
