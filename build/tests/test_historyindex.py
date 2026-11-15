@@ -101,6 +101,18 @@ class HistoryIndexTest(unittest.TestCase):
         self.assertEqual(index.touch.keys(), historyindex.build(self.repo, self.repo.head(), self.folders()).touch.keys())
         self.assert_matches_git(index)
 
+    def test_many_new_folders_are_walked_by_their_top_folder(self):
+        self.assertEqual(historyindex._pathspec([FOLDER, OTHER]), [FOLDER, OTHER])
+        many = [f"hg/2000/{n}" for n in range(historyindex.PATHSPEC_MAX + 1)] + ["ordin/2001/1"]
+        self.assertEqual(historyindex._pathspec(many), ["hg", "ordin"])
+        renamed = [f"hg-{n}-2000" for n in range(historyindex.PATHSPEC_MAX + 1)]
+        self.assertIsNone(historyindex._pathspec(renamed))
+        historyindex.ensure(self.repo, self.cache, [OLD])
+        with mock.patch.object(historyindex, "PATHSPEC_MAX", 1):
+            index = historyindex.ensure(self.repo, self.cache, self.folders())
+        self.assertEqual(index.to_json(), historyindex.build(self.repo, self.repo.head(), self.folders()).to_json())
+        self.assert_matches_git(index)
+
     def test_unchanged_head_walks_nothing(self):
         historyindex.ensure(self.repo, self.cache, self.folders())
         with mock.patch.object(historyindex, "_walk", side_effect=AssertionError("walked")):

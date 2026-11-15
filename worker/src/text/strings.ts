@@ -332,6 +332,8 @@ export const strings = {
   homeKindLege: "Legi",
   homeKindOug: "OUG",
   homeKindOg: "OG",
+  homeKindHg: "HG",
+  homeKindDecret: "Decrete",
   homeKindDecretLege: "Decrete-lege",
   homeKindHotarareParlament: "Hotărâri ale Parlamentului",
   homeKindsLabel: "Actele după tip",

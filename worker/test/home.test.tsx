@@ -327,20 +327,21 @@ describe("home", () => {
     expect(popular.match(/<li>/g)).toHaveLength(2);
   });
 
-  it("counts the acts by type from the act index and links each count to the filtered list", async () => {
+  it("counts the acts by type from the act index, links each count to the filtered list and leaves out empty types", async () => {
     await patchIndex(() => [
       entry("lege/1990/1", "lege"),
       entry("lege/1990/2", "lege"),
       entry("oug/2002/1", "oug"),
       ...Array.from({ length: 1200 }, (_, i) => entry(`og/2000/${i + 1}`, "og")),
       entry("hg/2000/1", "hg"),
+      entry("decret/1990/1", "decret"),
     ]);
     const html = await page("/");
     const line = /<p class="home-kinds"[^>]*>(.*?)<\/p>/s.exec(html)?.[1];
     expect(line).toBe(
       '<a href="/acte?tip=lege">Legi (2)</a> · <a href="/acte?tip=oug">OUG (1)</a> · <a href="/acte?tip=og">OG (1.200)</a> · ' +
-        '<a href="/acte?tip=decret-lege">Decrete-lege (0)</a> · <a href="/acte?tip=hotarare-parlament">Hotărâri ale Parlamentului (0)</a> · ' +
-        '<a href="/acte">Toate actele (1.204)</a>',
+        '<a href="/acte?tip=hg">HG (1)</a> · <a href="/acte?tip=decret">Decrete (1)</a> · ' +
+        '<a href="/acte">Toate actele (1.205)</a>',
     );
   });
 

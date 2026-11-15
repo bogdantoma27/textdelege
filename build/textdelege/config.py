@@ -37,6 +37,26 @@ class Config:
     headings_min_articles: int = 20
     d1_max_rows_read: int = 30_000_000
     d1_max_rows_written: int = 5_000_000
+    extra_kinds: tuple[str, ...] = ()
+
+    @property
+    def selection_key(self) -> str:
+        """The selection as the build state records it, so adding a kind is never a no-op."""
+        return "+".join((self.selection, *self.extra_kinds))
+
+
+def _extra_kinds(data: dict) -> tuple[str, ...]:
+    from .acts import PRIMARY_KINDS
+
+    raw = data.get("extra_kinds", [])
+    if not isinstance(raw, list) or not all(isinstance(kind, str) and kind for kind in raw):
+        raise ValueError("extra_kinds must be a list of kind names")
+    overlap = sorted(set(raw) & set(PRIMARY_KINDS))
+    if overlap:
+        raise ValueError(f"extra_kinds lists primary kinds: {', '.join(overlap)}")
+    if len(set(raw)) != len(raw):
+        raise ValueError("extra_kinds lists a kind twice")
+    return tuple(raw)
 
 
 def _section(data: dict, name: str, keys: tuple[str, ...], env: Mapping[str, str]):
@@ -74,4 +94,5 @@ def load_config(path: Path, env: Mapping[str, str] = os.environ) -> Config:
         headings_min_articles=int(data.get("headings_min_articles", 20)),
         d1_max_rows_read=int(data.get("d1_max_rows_read", 30_000_000)),
         d1_max_rows_written=int(data.get("d1_max_rows_written", 5_000_000)),
+        extra_kinds=_extra_kinds(data),
     )

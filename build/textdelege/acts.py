@@ -107,13 +107,19 @@ def old_folder_for(meta: ActMeta, paths_json: dict) -> str | None:
 
 
 def select_acts(
-    acts_json: dict, paths_json: dict, selection: Literal["codes", "primary", "consolidated", "current"]
+    acts_json: dict,
+    paths_json: dict,
+    selection: Literal["codes", "primary", "consolidated", "current"],
+    extra_kinds: tuple[str, ...] = (),
 ) -> list[ActMeta]:
+    """Acts of the selection, plus every act of the extra kinds (read from the source's shards)."""
     metas = []
     for r in acts_json["acts"]:
         if r.get("withdrawn_by") is not None:
             continue
-        if selection == "codes":
+        if r["kind"] in extra_kinds:
+            wanted = True
+        elif selection == "codes":
             wanted = bool(r.get("code")) or r["kind"] == "constitutie"
         elif selection == "consolidated":
             wanted = (

@@ -30,6 +30,22 @@ def folders_for(acts_json: dict, paths_json: dict) -> list[str]:
     return sorted(folders)
 
 
+PATHSPEC_MAX = 200
+
+
+def _pathspec(folders: list[str]) -> list[str] | None:
+    """The folders themselves when there are few, else their top folders, else no limit.
+
+    A whole kind (tens of thousands of folders) does not fit on a Windows command line; the
+    walk then reads every commit under the top folders (or every commit, when the old folder
+    names of a kind are themselves thousands of top folders) and _record keeps only the wanted ones.
+    """
+    if len(folders) <= PATHSPEC_MAX:
+        return folders
+    tops = sorted({folder.split("/")[0] for folder in folders})
+    return tops if len(tops) <= PATHSPEC_MAX else None
+
+
 def _walk(repo: GitRepo, revisions: list[str], pathspec: list[str] | None = None) -> Iterator[tuple[Commit, list[str]]]:
     command = [
         "git", "-c", "core.quotepath=false", "log", "--no-merges", "--no-renames", "--name-only",
@@ -166,8 +182,10 @@ class HistoryIndex:
             self.touch[folder] = items + self.touch.get(folder, [])
         if added:
             wanted_new = set(added)
+            # _record only looks as deep as the deepest known folder; new folders may be deeper.
+            self._depth = max(self._depth, *(len(f.split("/")) for f in added))
             gathered: dict[str, list] = {}
-            for commit, names in _walk(repo, [head], added):
+            for commit, names in _walk(repo, [head], _pathspec(added)):
                 self._record(commit, names, wanted_new, gathered)
             self.touch.update(gathered)
         self.folders |= set(wanted)

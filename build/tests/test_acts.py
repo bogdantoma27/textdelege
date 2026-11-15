@@ -92,6 +92,17 @@ class SelectTest(unittest.TestCase):
         withdrawn_codes = select_acts(acts_json(withdrawn), PATHS, "codes")
         self.assertNotIn("legea-2-2000", [m.slug for m in withdrawn_codes])
 
+    def test_extra_kinds_join_whole_except_withdrawn(self):
+        hg = row("hg-2-2000", None, "HG nr. 2/2000", "hg/2000/2", "hg", "as published, amendments not yet checked")
+        gone = row("hg-3-2000", None, "HG nr. 3/2000", "hg/2000/3", "hg", "in force", withdrawn_by="x")
+        ordin = row("ordin-1-2000", None, "Ordin", "ordin/2000/1", "ordin", "in force")
+        for selection in ("primary", "codes"):
+            slugs = [m.slug for m in select_acts(acts_json(PLAIN, hg, gone, ordin), PATHS, selection, ("hg",))]
+            self.assertIn("hg-2-2000", slugs, selection)
+            self.assertNotIn("hg-3-2000", slugs, selection)
+            self.assertNotIn("ordin-1-2000", slugs, selection)
+            self.assertEqual(slugs[0], "constitutia")
+
 
 class ConsolidatedSelectionTest(unittest.TestCase):
     def slugs(self, *extra):
@@ -249,8 +260,18 @@ class ConfigTest(unittest.TestCase):
         cfg = load_config(self.write("headings = true" + chr(10) + "headings_min_articles = 5" + chr(10)), {})
         self.assertEqual((cfg.headings, cfg.headings_min_articles), (True, 5))
 
+    def test_extra_kinds_are_read_and_checked(self):
+        cfg = load_config(self.write(""), {})
+        self.assertEqual((cfg.extra_kinds, cfg.selection_key), ((), "codes"))
+        cfg = load_config(self.write('selection = "primary"\nextra_kinds = ["hg", "ordin"]\n'), {})
+        self.assertEqual((cfg.extra_kinds, cfg.selection_key), (("hg", "ordin"), "primary+hg+ordin"))
+        for bad in ('extra_kinds = "hg"', 'extra_kinds = ["lege"]', 'extra_kinds = ["hg", "hg"]', 'extra_kinds = [""]'):
+            with self.subTest(bad), self.assertRaises(ValueError):
+                load_config(self.write(bad + "\n"), {})
+
     def test_repo_config_loads(self):
         cfg = load_config(Path(__file__).parents[1] / "config.toml", {})
         self.assertEqual(cfg.selection, "primary")
+        self.assertEqual(cfg.extra_kinds, ("hg",))
         self.assertEqual(cfg.headings_min_articles, 20)
         self.assertTrue(cfg.headings)

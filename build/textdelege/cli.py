@@ -39,6 +39,7 @@ from .objects import (
 )
 from .publish import MANIFEST_KEY, IndexRows, publish, write_index_sql
 from .r2 import R2Client
+from .shards import ShardError, load_extra, merge_laws
 from .rulings import (
     Ruling,
     decision_ids,
@@ -220,9 +221,16 @@ def extract_source(
     head_blobs = repo.prefetch_head(["data/acts.json", "data/paths.json"])
     acts_json = json.loads(_require(repo, head, "data/acts.json"))
     paths_json = json.loads(_require(repo, head, "data/paths.json"))
-    metas = select_acts(acts_json, paths_json, config.selection)
+    try:
+        extra_rows, extra_laws, extra_blobs = load_extra(repo, head, config.extra_kinds)
+    except ShardError as error:
+        raise PipelineError(str(error)) from error
+    head_blobs += extra_blobs
+    if extra_rows:
+        acts_json = {**acts_json, "acts": [*acts_json["acts"], *extra_rows]}
+    metas = select_acts(acts_json, paths_json, config.selection, config.extra_kinds)
     if not metas:
-        raise PipelineError(f"no acts selected with selection = {config.selection!r}")
+        raise PipelineError(f"no acts selected with selection = {config.selection_key!r}")
     old_folders = {meta.path: old_folder_for(meta, paths_json) for meta in metas}
     if repo.history is None:
         repo.history = historyindex.ensure(
@@ -245,7 +253,7 @@ def extract_source(
     ]
     head_blobs += repo.prefetch_head([*shards, *decision_folders])
 
-    laws_csv = repo.show_file(head, "data/laws.csv") or ""
+    laws_csv = merge_laws(repo.show_file(head, "data/laws.csv") or "", extra_laws)
     labels = {key: row["label"] for key, row in parse_laws_csv(laws_csv).items()}
     credits = parse_credits(repo.show_file(head, "data/credits.csv") or "")
     fetch_seconds = time.monotonic() - fetch_started
@@ -574,7 +582,7 @@ def cmd_build(args, *, today, now, oracle, r2, d1, fetch=None) -> int:
         "fingerprint": fingerprint(),
         "build": make_build_id(now, head),
         "today": today.isoformat(),
-        "selection": config.selection,
+        "selection": config.selection_key,
         "source_url": config.source_url,
         "schema_version": str(SCHEMA_VERSION),
     }

@@ -36,6 +36,8 @@ const KIND_LINKS: { kind: string; label: Key }[] = [
   { kind: "lege", label: "homeKindLege" },
   { kind: "oug", label: "homeKindOug" },
   { kind: "og", label: "homeKindOg" },
+  { kind: "hg", label: "homeKindHg" },
+  { kind: "decret", label: "homeKindDecret" },
   { kind: "decret-lege", label: "homeKindDecretLege" },
   { kind: "hotarare-parlament", label: "homeKindHotarareParlament" },
 ];
@@ -282,7 +284,9 @@ function Recent({ items, names }: { items: ChangeItem[]; names: ActNames }) {
 function Kinds({ index }: { index: ActIndexEntry[] }) {
   const count = (kind: string) => index.filter((entry) => entry.kind === kind).length;
   const links = [
-    ...KIND_LINKS.map(({ kind, label }) => ({ href: `/acte?tip=${kind}`, text: `${t(label)} (${grouped(count(kind))})` })),
+    ...KIND_LINKS.map(({ kind, label }) => ({ kind, label, n: count(kind) }))
+      .filter(({ n }) => n > 0)
+      .map(({ kind, label, n }) => ({ href: `/acte?tip=${kind}`, text: `${t(label)} (${grouped(n)})` })),
     { href: "/acte", text: `${t("homeAllActs")} (${grouped(index.length)})` },
   ];
   return (
