@@ -21,6 +21,10 @@ export type Route =
 const NUMBERED_KINDS = new Set(["lege", "oug", "og", "hg", "decret", "decret-lege"]);
 const PARLIAMENT = "hotarare-parlament";
 const CHAMBERS = new Set(["camera", "senat"]);
+// Acts of ministries and authorities: kind/issuer/year/number, the number sometimes a date (10-27-2).
+export const ISSUED_KINDS = new Set(["norma", "regulament", "decizie", "circulara", "hotarare", "instructiuni", "metodologie", "procedura", "ghid", "criterii", "precizari", "protocol"]);
+const ISSUER = /^[a-z][a-z0-9-]*$/;
+const ISSUED_NUMBER = /^\d[0-9a-z-]*$/;
 const PANELS = new Set(["ril", "hp", "hp-penal", "su", "scaf", "alte"]);
 const TABS = new Set(["istoric", "jurisprudenta", "statistici", "date"]);
 const HELP = new Set(["despre", "legenda"]);
@@ -75,6 +79,7 @@ export interface ActPathParts {
 export function actPathParts(path: string): ActPathParts {
   const [kind = "", ...rest] = path.split("/");
   const chamber = kind === PARLIAMENT && rest.length === 3 ? (rest.shift() ?? null) : null;
+  if (ISSUED_KINDS.has(kind) && rest.length === 3) rest.shift();
   const [year = "", number = ""] = rest;
   return { kind, chamber, year, number };
 }
@@ -145,6 +150,12 @@ function readActRef(segments: string[]): { actRef: string; used: number } | null
     if (chamber === undefined || year === undefined || number === undefined) return null;
     if (!CHAMBERS.has(chamber) || !DIGITS.test(year) || !DIGITS.test(number)) return null;
     return { actRef: `${first}/${chamber}/${year}/${number}`, used: 4 };
+  }
+  if (ISSUED_KINDS.has(first)) {
+    const [, issuer, year, number] = segments;
+    if (issuer === undefined || year === undefined || number === undefined) return null;
+    if (!ISSUER.test(issuer) || !DIGITS.test(year) || !ISSUED_NUMBER.test(number)) return null;
+    return { actRef: `${first}/${issuer}/${year}/${number}`, used: 4 };
   }
   if (NUMBERED_KINDS.has(first)) {
     const [, year, number] = segments;

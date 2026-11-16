@@ -93,6 +93,18 @@ export const KINDS = [
   "decret-lege",
   "decret",
   "hotarare-parlament",
+  "norma",
+  "regulament",
+  "decizie",
+  "circulara",
+  "hotarare",
+  "instructiuni",
+  "metodologie",
+  "procedura",
+  "ghid",
+  "criterii",
+  "precizari",
+  "protocol",
 ] as const;
 
 const KIND_PLURALS: Record<string, Key> = {
@@ -105,6 +117,18 @@ const KIND_PLURALS: Record<string, Key> = {
   decret: "kindsDecret",
   "decret-lege": "kindsDecretLege",
   "hotarare-parlament": "kindsHotarareParlament",
+  norma: "kindsNorma",
+  regulament: "kindsRegulament",
+  decizie: "kindsDecizie",
+  circulara: "kindsCirculara",
+  hotarare: "kindsHotarare",
+  instructiuni: "kindsInstructiuni",
+  metodologie: "kindsMetodologie",
+  procedura: "kindsProcedura",
+  ghid: "kindsGhid",
+  criterii: "kindsCriterii",
+  precizari: "kindsPrecizari",
+  protocol: "kindsProtocol",
 };
 
 export function kindPlural(kind: string): string {

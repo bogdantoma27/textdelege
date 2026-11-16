@@ -243,6 +243,8 @@ describe("the acts page", () => {
     expect(html).not.toContain('href="/lege/1990/31"');
     expect(html).toContain('<option value="lege" selected="">Legi</option>');
     expect(html).toContain('<option value="abrogate" selected="">Abrogate</option>');
+    expect(html).toContain('<option value="norma">Norme</option>');
+    expect(html).toContain('<option value="hotarare">Hotărâri ale autorităților</option>');
     expect(html).toMatch(/name="an"[^>]*value="1990"|value="1990"[^>]*name="an"/);
     expect(html).toContain("1 act");
   });

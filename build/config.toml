@@ -1,6 +1,6 @@
 source_url = "https://github.com/lexifina/romania-law"
 selection = "primary"
-extra_kinds = ["hg"]
+extra_kinds = ["hg", "norma", "regulament", "decizie", "circulara", "hotarare", "instructiuni", "metodologie", "procedura", "ghid", "criterii", "precizari", "protocol"]
 cache_dir = ".cache"
 headings = true
 headings_min_articles = 20

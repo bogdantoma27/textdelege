@@ -39,7 +39,7 @@ from .objects import (
 )
 from .publish import MANIFEST_KEY, IndexRows, publish, write_index_sql
 from .r2 import R2Client
-from .shards import ShardError, load_extra, merge_laws
+from .shards import ShardError, ever_had_articles, load_extra, merge_laws
 from .rulings import (
     Ruling,
     decision_ids,
@@ -237,6 +237,13 @@ def extract_source(
         repo.history = historyindex.ensure(
             repo, config.cache_dir, historyindex.folders_for(acts_json, paths_json), r2
         )
+    if config.extra_kinds:
+        extra = set(config.extra_kinds)
+        metas = [
+            meta for meta in metas
+            if meta.kind not in extra
+            or ever_had_articles(repo.history, [meta.path] + ([old_folders[meta.path]] if old_folders[meta.path] else []))
+        ]
     head_blobs += repo.prefetch_head([*DATA_FILES, READER])
     freshness_index = repo.show_file(head, INDEX)
     shards = shard_files(json.loads(freshness_index), metas) if freshness_index else []

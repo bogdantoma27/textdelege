@@ -65,6 +65,18 @@ const KINDS: Record<string, Key> = {
   cod: "kindCod",
   "hotarare-parlament": "kindHotarareParlament",
   code: "kindCod",
+  norma: "kindNorma",
+  regulament: "kindRegulament",
+  decizie: "kindDecizie",
+  circulara: "kindCirculara",
+  hotarare: "kindHotarare",
+  instructiuni: "kindInstructiuni",
+  metodologie: "kindMetodologie",
+  procedura: "kindProcedura",
+  ghid: "kindGhid",
+  criterii: "kindCriterii",
+  precizari: "kindPrecizari",
+  protocol: "kindProtocol",
 };
 
 const actName = (act: ActObject) => act.short ?? act.title;

@@ -65,6 +65,8 @@ describe("act path parts", () => {
     ["hotarare-parlament/camera/1990/14", { kind: "hotarare-parlament", chamber: "camera", year: "1990", number: "14" }],
     ["hotarare-parlament/senat/2005/3", { kind: "hotarare-parlament", chamber: "senat", year: "2005", number: "3" }],
     ["constitutie/1991", { kind: "constitutie", chamber: null, year: "1991", number: "" }],
+    ["norma/aep/2019/18", { kind: "norma", chamber: null, year: "2019", number: "18" }],
+    ["regulament/agricultura/2001/11-09-2", { kind: "regulament", chamber: null, year: "2001", number: "11-09-2" }],
   ])("splits %s", (path, expected) => {
     expect(actPathParts(path)).toEqual(expected);
   });
@@ -158,6 +160,14 @@ describe("parsePath", () => {
     ["/hotarare-parlament/camera/1990/14/istoric", act("hotarare-parlament/camera/1990/14", null, "istoric")],
     ["/modificari/hotarare-parlament/camera/1990/14", changes("hotarare-parlament/camera/1990/14", null, "html")],
     ["/hotarare-parlament/2000/1", null],
+    ["/norma/aep/2019/18", act("norma/aep/2019/18")],
+    ["/regulament/agricultura/2001/11-09-2", act("regulament/agricultura/2001/11-09-2")],
+    ["/decizie/ancom/2002/137/art-3", article("decizie/ancom/2002/137", "art-3")],
+    ["/circulara/bnr/1995/5/istoric", act("circulara/bnr/1995/5", null, "istoric")],
+    ["/modificari/norma/aep/2019/18", changes("norma/aep/2019/18", null, "html")],
+    ["/norma/aep/2019", null],
+    ["/norma/2019/18", null],
+    ["/norma/AEP/2019/18", null],
     ["/hotarare-parlament/camera/1990", null],
     ["/hotarare-parlament/consiliu/1990/14", null],
     ["/lege/2007/363/art-t2-i", article("lege/2007/363", "art-t2-i")],

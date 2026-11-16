@@ -43,6 +43,37 @@ def merge_laws(base: str, extra: list[str]) -> str:
     return out.getvalue()
 
 
+def whole_documents(repo, head: str, kinds: tuple[str, ...]) -> set[str]:
+    """Act folders of these kinds that are one whole document: a text.md and no article files.
+
+    The site has no page that shows a whole text yet, so these acts are left out for now.
+    Acts repealed in full keep no article files either, but they have no text.md and stay.
+    """
+    listing = repo._git("ls-tree", "-r", "--name-only", head, "--", *kinds)
+    texts, articles = set(), set()
+    for name in listing.splitlines():
+        folder, _, file = name.rpartition("/")
+        if file == "text.md":
+            texts.add(folder)
+        elif file.startswith("art-"):
+            articles.add(folder)
+    return texts - articles
+
+
+def ever_had_articles(history, folders: list[str]) -> bool:
+    """Whether any commit touched an article file directly in these folders.
+
+    Acts known only from their README (never any article, nor a whole text) would be
+    empty pages, so acts of the extra kinds are kept only when this holds.
+    """
+    return any(
+        name.startswith("art-")
+        for folder in folders
+        for _sha, names in history.touch.get(folder, [])
+        for name in names
+    )
+
+
 def load_extra(repo, head: str, kinds: tuple[str, ...]) -> tuple[list[dict], list[str], int]:
     """Act rows and laws CSV texts of the extra kinds, and how many blobs were prefetched."""
     if not kinds:
@@ -54,14 +85,17 @@ def load_extra(repo, head: str, kinds: tuple[str, ...]) -> tuple[list[dict], lis
     entries = shard_entries(json.loads(text), kinds)
     files = [entry["acts"] for entry in entries] + [entry["laws"] for entry in entries if entry.get("laws")]
     blobs += repo.prefetch_head(files)
+    documents = whole_documents(repo, head, kinds)
     rows: list[dict] = []
     for entry in entries:
         raw = repo.show_file(head, entry["acts"])
         if raw is None:
             raise ShardError(f"{entry['acts']} is missing from the source repository")
-        # Withdrawn acts have no folder (path is null), so they are left out here.
+        # Withdrawn acts have no folder (path is null); whole documents wait for their own page.
         rows.extend(
-            row for row in json.loads(raw)["acts"] if row.get("withdrawn_by") is None and row.get("path")
+            row
+            for row in json.loads(raw)["acts"]
+            if row.get("withdrawn_by") is None and row.get("path") and row["path"] not in documents
         )
     laws = [
         found
