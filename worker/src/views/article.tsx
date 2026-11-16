@@ -31,7 +31,7 @@ import {
 import { Indexed } from "./indexed";
 import { CopyIcon } from "./icons";
 import { Layout, ORIGIN } from "./layout";
-import { LawLink, StatusBadge, VERBS, lawLabels } from "./shared";
+import { LawLink, StatusBadge, VERBS, lawLabelText, lawLabels } from "./shared";
 
 export interface ArticleContext {
   now: string;
@@ -351,7 +351,7 @@ export function renderArticle(
               points={article.versions.map((v) => ({
                 date: v.from,
                 href: onDate(v.from),
-                name: v.law?.label ?? "",
+                name: v.law ? lawLabelText(v.law.key, v.law.label) : "",
               }))}
             />
           </section>

@@ -19,7 +19,7 @@ import { actUrl, articleUrl, compareUrl, sourceFileUrl } from "../lib/urls";
 import { versionOn } from "../lib/versions";
 import { CitationPanel, Contents, type RailProps } from "./article-rails";
 import { ArrowDownIcon, ArrowUpIcon, ChevronLeftIcon } from "./icons";
-import { LawLink, VERBS, lawLabels } from "./shared";
+import { LawLink, VERBS, lawLabelText, lawLabels } from "./shared";
 import { Indexed } from "./indexed";
 import { Layout, ORIGIN } from "./layout";
 import { Breadcrumbs, OffLink, Options, Pagination, Panel, Support, Timeline, WarningText } from "./components";
@@ -460,7 +460,7 @@ function Pick(props: {
   const options = (selected: string) =>
     article.versions.map((version) => (
       <option value={version.from} selected={version.from === selected ? true : undefined}>
-        {version.law ? `${formatRo(version.from)} · ${version.law.label}` : formatRo(version.from)}
+        {version.law ? `${formatRo(version.from)} · ${lawLabelText(version.law.key, version.law.label)}` : formatRo(version.from)}
       </option>
     ));
   return (
@@ -676,7 +676,7 @@ export function renderCompare(
             points={article.versions.map((version) => ({
               date: version.from,
               href: articleUrl(actRef, article, version.from),
-              name: version.law?.label ?? "",
+              name: version.law ? lawLabelText(version.law.key, version.law.label) : "",
             }))}
           />
         </section>

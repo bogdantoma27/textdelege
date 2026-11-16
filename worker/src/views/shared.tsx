@@ -62,12 +62,12 @@ export function outcomeText(outcome: string): string {
 export const grouped = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
 export function lawLabels(act: ActObject, article: ArticleObject): Map<string, string> {
-  const labels = new Map(act.laws.map((law) => [law.key, law.label]));
+  const labels = new Map(act.laws.map((law) => [law.key, lawLabelText(law.key, law.label)]));
   for (const version of article.versions) {
-    if (version.law) labels.set(version.law.key, version.law.label);
+    if (version.law) labels.set(version.law.key, lawLabelText(version.law.key, version.law.label));
   }
   for (const event of article.events) {
-    if (event.law) labels.set(event.law.key, event.law.label);
+    if (event.law) labels.set(event.law.key, lawLabelText(event.law.key, event.law.label));
   }
   return labels;
 }

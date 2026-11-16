@@ -279,6 +279,14 @@ describe("article comparison page", () => {
     expect(html).toContain("în vigoare din 09.07.2023");
   });
 
+  it("names a version without a known amending act as unnamed, not by the source's commit author", () => {
+    const unnamed = structuredClone(one);
+    unnamed.versions[1]!.law = { key: "romania-law", label: "Lexifina" };
+    const html = view(unnamed, "2011-10-01", "2023-07-09", {}, null);
+    expect(html).toContain('<option value="2023-07-09" selected="">09.07.2023 · act nemenționat de sursă</option>');
+    expect(html).not.toContain("Lexifina");
+  });
+
   it("shows the Monitorul Oficial reference and omits the amending act when it is unknown", () => {
     const bare = structuredClone(one);
     bare.versions[1]!.law = null;
