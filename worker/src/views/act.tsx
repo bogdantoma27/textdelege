@@ -317,6 +317,18 @@ function FullText(props: {
   text: ActText;
 }) {
   const { ctx, act, actRef, path, text } = props;
+  if (act.articles.length === 0) {
+    const official = act.freshness?.official_url ?? act.portal;
+    return (
+      <section aria-labelledby="textul">
+        <h2 id="textul">{t("actFullTextHeading")}</h2>
+        <p class="toc-note">{t("noTextNotice")}</p>
+        <p>
+          {t("sourceOfficial")} <a href={official}>{hostOf(official)}</a>
+        </p>
+      </section>
+    );
+  }
   const filterQuery = ctx.filter === "" ? "" : `&cuprins=${encodeURIComponent(ctx.filter)}`;
   const { paged } = text;
   const first = paged.items[0];
@@ -334,6 +346,7 @@ function FullText(props: {
   return (
     <section aria-labelledby="textul">
       <h2 id="textul">{t("actFullTextHeading")}</h2>
+      {!(act.articles.length === 1 && act.articles[0]!.number === "text") && (
       <p class="actions">
         <span>
           <Indexed
@@ -347,6 +360,7 @@ function FullText(props: {
           />
         </span>
       </p>
+      )}
       {paged.pages > 1 && (
         <div class="pages-top">
           <Pages

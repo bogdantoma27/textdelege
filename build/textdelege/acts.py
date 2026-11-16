@@ -4,6 +4,8 @@ from dataclasses import dataclass, replace
 from datetime import date
 from typing import Literal
 
+from .issuers import issuer_label
+
 PRIMARY_KINDS = (
     "constitutie", "lege", "oug", "og", "decret", "decret-lege", "hotarare-parlament", "cod", "alte",
 )
@@ -106,6 +108,10 @@ def old_folder_for(meta: ActMeta, paths_json: dict) -> str | None:
     return None
 
 
+def _issued(short: str | None) -> str | None:
+    return None if short is None else issuer_label(short)
+
+
 def select_acts(
     acts_json: dict,
     paths_json: dict,
@@ -151,6 +157,6 @@ def select_acts(
     aliases = aliases_for(metas)
     shorts = short_names_for(metas)
     return [
-        replace(m, alias=aliases.get(m.path), short=shorts.get(m.path, m.short))
+        replace(m, alias=aliases.get(m.path), short=_issued(shorts.get(m.path, m.short)))
         for m in metas
     ]

@@ -539,6 +539,23 @@ describe("full text", () => {
     expect(html).toContain(`href="/${BIG}?pagina=2&amp;cuprins=titlu"`);
   });
 
+  it("shows a notice and the official link when the act has no articles", () => {
+    const act = { ...bigAct(), articles: [], portal: "https://legislatie.just.ro/Public/DetaliiDocument/1" };
+    const html = String(renderAct(ctx(), act, "text", { paged: paginate(act.articles, 1, 2), articles: [] }));
+    expect(html).toContain("Textul acestui act nu este încă disponibil aici.");
+    expect(html).toContain('href="https://legislatie.just.ro/Public/DetaliiDocument/1"');
+    expect(html).not.toContain("Articolele");
+  });
+
+  it("does not print an article range for a whole-text act", () => {
+    const whole = { ...bigAct().articles[0]!, file: "art-text", number: "text", title: null };
+    const act = { ...bigAct(), articles: [whole] };
+    const html = String(renderAct(ctx(), act, "text", { paged: paginate(act.articles, 1, 2), articles: [null] }));
+    expect(html).toContain("Textul actului");
+    expect(html).not.toContain("Articolele");
+    expect(html).not.toContain("Art. text");
+  });
+
   it("says so when an article object is missing", () => {
     const act = bigAct();
     const paged = paginate(act.articles, 1, 2);

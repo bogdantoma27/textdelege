@@ -23,6 +23,7 @@ from .events import events_for
 from .extract import Article, extract_core, finalize_act, version_on
 from .freshness import INDEX, load_freshness, load_freshness_summary, shard_files
 from .gitrepo import GitError, GitRepo, remove_tree
+from .issuers import relabel_articles
 from .selection import act_blob_ids
 from .laws import changes_feed, laws_from, parse_laws_csv, upcoming
 from .objects import (
@@ -39,6 +40,7 @@ from .objects import (
 )
 from .publish import MANIFEST_KEY, IndexRows, publish, write_index_sql
 from .r2 import R2Client
+from .wholetext import whole_text_articles
 from .shards import ShardError, ever_had_articles, load_extra, merge_laws
 from .rulings import (
     Ruling,
@@ -341,7 +343,11 @@ def extract_source(
             if cores is None:
                 continue
             fresh.add(meta.path)
-        articles_by_act[meta.path] = finalize_act(cores, today)
+        articles = finalize_act(cores, today)
+        if not articles:
+            articles = whole_text_articles(repo, meta.path, old_folders[meta.path], today)
+        relabel_articles(articles)
+        articles_by_act[meta.path] = articles
     missing = len(metas) - len(articles_by_act)
     if missing:
         return Extracted(

@@ -12,6 +12,7 @@ from functools import partial
 from pathlib import Path
 
 from .extract import Article, split_body, version_on
+from .wholetext import ARTICLE_FILE as WHOLE_TEXT_FILE
 from .gitrepo import GitRepo, normalise_text
 
 BOUNDARY_ACTS = 5
@@ -70,6 +71,10 @@ def sample(
     fresh: set[str] | None = None,
 ) -> list[Sample]:
     rng = random.Random(seed)
+    # A whole-text article has no article file the reader could compare with.
+    articles_by_act = {
+        act: [a for a in articles if a.file != WHOLE_TEXT_FILE] for act, articles in articles_by_act.items()
+    }
     acts = sorted(
         act for act, articles in articles_by_act.items() if any(a.versions for a in articles)
     )

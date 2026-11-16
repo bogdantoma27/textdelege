@@ -19,6 +19,7 @@ function ambiguousNumbers(articles: readonly ArticleRef[]): ReadonlySet<string> 
 }
 
 export function articleLabel(article: ArticleRef, siblings?: readonly ArticleRef[]): string {
+  if (article.number === "text") return t("articleWholeText");
   const label =
     article.number.toUpperCase() === "UNIC" ? t("articleUnique") : t("articleAbbr", { number: article.number });
   if (siblings === undefined || !ambiguousNumbers(siblings).has(article.number)) return label;

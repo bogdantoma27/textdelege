@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .events import Event, Verb, events_for
 from .extract import Article
+from .issuers import issuer_label
 
 MO_MARKER = "Monitorul Oficial"
 
@@ -81,7 +82,7 @@ def laws_from(laws_csv: str, articles_by_act: dict[str, list[Article]]) -> dict[
     laws: dict[str, Law] = {}
     for key, label in _referenced(articles_by_act).items():
         if key in rows:
-            laws[key] = Law(**rows[key])
+            laws[key] = Law(**{**rows[key], "label": issuer_label(rows[key]["label"])})
         else:
             laws[key] = Law(key, label, "", "", None, None, [], None, None)
     ordered = []

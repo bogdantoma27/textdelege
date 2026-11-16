@@ -94,6 +94,11 @@ describe("article labels", () => {
   it("names the sole article", () => {
     expect(articleLabel(articles[2]!, articles)).toBe("Articol unic");
   });
+
+  it("names a whole-text article by what it is", () => {
+    const whole = { ...articles[3]!, file: "art-text", number: "text" };
+    expect(articleLabel(whole, [whole])).toBe("Textul actului");
+  });
 });
 
 describe("cross-reference links", () => {
