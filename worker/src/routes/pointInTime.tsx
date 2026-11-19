@@ -2,9 +2,9 @@ import { type Context, Hono } from "hono";
 import { ordered } from "../lib/act-order";
 import { pageNumber } from "../lib/act";
 import { parseDate, today } from "../lib/dates";
-import type { AppEnv } from "../lib/store";
-import type { ActIndexEntry } from "../lib/types";
-import { actPathParts, parsePath } from "../lib/urls";
+import type { AppEnv, Store } from "../lib/store";
+import type { ActIndexEntry, Manifest } from "../lib/types";
+import { parsePath } from "../lib/urls";
 import { type PitAct, type PitOthers, PAGE_SIZE, renderPointInTime } from "../views/point-in-time";
 
 const KIND_ORDER = ["lege", "oug", "og", "hg", "decret-lege", "decret", "hotarare-parlament"];
@@ -14,26 +14,32 @@ const kindRank = (kind: string) => {
   return rank === -1 ? KIND_ORDER.length : rank;
 };
 
-function byNewest(a: ActIndexEntry, b: ActIndexEntry): number {
-  const { year: yearA, number: numberA } = actPathParts(a.path);
-  const { year: yearB, number: numberB } = actPathParts(b.path);
-  return (
-    Number(yearB) - Number(yearA) || Number(numberB) - Number(numberA) || a.path.localeCompare(b.path)
-  );
-}
-
-function otherActs(rest: ActIndexEntry[], tip: string | undefined, rawPage: string | undefined): PitOthers | null {
-  if (rest.length === 0) return null;
-  const counts = new Map<string, number>();
-  for (const act of rest) counts.set(act.kind, (counts.get(act.kind) ?? 0) + 1);
+async function otherActs(
+  store: Store,
+  featured: Manifest["acts"],
+  tip: string | undefined,
+  rawPage: string | undefined,
+): Promise<PitOthers | null> {
+  // Counts per kind come from the build's memo; the featured acts (read from D1, one bounded query) are taken out.
+  const [all, featuredRows] = await Promise.all([store.kindCounts(), store.actsByPath(featured.map((act) => act.path))]);
+  const counts = new Map(all);
+  for (const { kind } of featuredRows.values()) counts.set(kind, (counts.get(kind) ?? 0) - 1);
   const kinds = [...counts]
+    .filter(([, count]) => count > 0)
     .map(([kind, count]) => ({ kind, count }))
     .sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.kind.localeCompare(b.kind));
+  if (kinds.length === 0) return null;
   const selected = kinds.find((entry) => entry.kind === tip)?.kind ?? kinds[0]!.kind;
-  const members = rest.filter((act) => act.kind === selected).sort(byNewest);
-  const pages = Math.max(1, Math.ceil(members.length / PAGE_SIZE));
+  const total = kinds.find((entry) => entry.kind === selected)!.count;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(pageNumber(rawPage ?? null), pages);
-  const items: PitAct[] = members.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((act) => toPitAct(act, act.from));
+  const members = await store.actsOfKind(
+    selected,
+    featured.map((act) => act.path),
+    PAGE_SIZE,
+    (page - 1) * PAGE_SIZE,
+  );
+  const items: PitAct[] = members.map((act) => toPitAct(act, act.from));
   return { kinds, selected, items, page, pages };
 }
 
@@ -51,12 +57,11 @@ export const pointInTimeRoutes = new Hono<AppEnv>();
 
 async function pointInTimePage(c: Context<AppEnv>, date: string, invalid?: string) {
   const store = c.get("store");
-  const [manifest, index] = await Promise.all([store.manifest(), store.actIndex()]);
-  const fromOf = new Map(index.map((entry) => [entry.path, entry.from]));
-  const acts: PitAct[] = ordered(manifest.acts).map((entry) => toPitAct(entry, fromOf.get(entry.path) ?? null));
-  const featured = new Set(manifest.acts.map((entry) => entry.path));
-  const others = otherActs(
-    index.filter((entry) => !featured.has(entry.path)),
+  const manifest = await store.manifest();
+  const acts: PitAct[] = ordered(manifest.acts).map((entry) => toPitAct(entry, entry.from ?? null));
+  const others = await otherActs(
+    store,
+    manifest.acts,
     c.req.query("tip"),
     c.req.query("pagina"),
   );

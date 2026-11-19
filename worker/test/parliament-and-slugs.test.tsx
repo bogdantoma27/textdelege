@@ -1,14 +1,13 @@
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { listFromIndex } from "../src/lib/act-list";
 import { articleLabel } from "../src/lib/article-label";
 import { parseCitation } from "../src/lib/citation";
 import { citedAct, findCitedAct } from "../src/lib/resolve";
 import { type Store, createStore } from "../src/lib/store";
 import { linkCrossReferences, linkableNumbers } from "../src/lib/text";
 import type { ActArticleEntry, ActIndexEntry, ActObject, ArticleObject } from "../src/lib/types";
-import { replaceObject } from "./support";
+import { putActs, replaceObject } from "./support";
 
 const get = (path: string) => exports.default.fetch(`https://example.com${path}`, { redirect: "manual" });
 
@@ -66,17 +65,20 @@ describe("Parliament decision citations", () => {
 });
 
 describe("acts list with Parliament decisions", () => {
-  it("reads year and number from four-segment paths", () => {
-    const list = listFromIndex(
-      [entry("hotarare-parlament/camera/1990/14"), entry("hotarare-parlament/senat/2005/3"), entry("lege/2009/287")],
-      { page: 1 },
-    );
-    expect(list.items.map((item) => [item.path, item.year, item.number])).toEqual([
-      ["lege/2009/287", 2009, "287"],
-      ["hotarare-parlament/senat/2005/3", 2005, "3"],
-      ["hotarare-parlament/camera/1990/14", 1990, "14"],
-    ]);
-    expect(listFromIndex([entry("hotarare-parlament/senat/2005/3")], { page: 1, q: "3" }).total).toBe(1);
+  it("reads year and number from four-segment paths", async () => {
+    const paths = ["hotarare-parlament/camera/1990/14", "hotarare-parlament/senat/2005/3", "lege/2099/287"];
+    const restore = await putActs(paths.map((path) => entry(path)));
+    try {
+      const list = await createStore(env).listActs({ page: 1, year: undefined });
+      expect(list.items.filter((item) => paths.includes(item.path)).map((item) => [item.path, item.year, item.number])).toEqual([
+        ["lege/2099/287", 2099, "287"],
+        ["hotarare-parlament/senat/2005/3", 2005, "3"],
+        ["hotarare-parlament/camera/1990/14", 1990, "14"],
+      ]);
+      expect((await createStore(env).listActs({ page: 1, kind: "hotarare-parlament", q: "3" })).total).toBe(1);
+    } finally {
+      await restore();
+    }
   });
 });
 

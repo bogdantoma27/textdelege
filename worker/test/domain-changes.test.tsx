@@ -38,10 +38,7 @@ async function seed(items: ChangeItem[], path = "lege/2015/227") {
       latest: "2026-03-05",
       articles: 1,
     };
-    // The pages read the acts from D1, the sitemap from the R2 index.
     restores.push(await putActs([act]));
-    const index = structuredClone(await store.actIndex());
-    restores.push(await replaceObject("acts/index.json", { schema: "textdelege/act-index/1", acts: [...index, act] }));
   }
   restores.push(
     await replaceObject(`changes/acts/${path}.json`, {

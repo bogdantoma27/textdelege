@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { pageNumber } from "../lib/act";
-import { listFromIndex } from "../lib/act-list";
 import type { AppEnv } from "../lib/store";
 import { KINDS } from "../views/shared";
 import { type ActsQuery, MAX_TEXT, STATUS_PARAMS, renderActs } from "../views/acts";
@@ -31,6 +30,6 @@ actsRoutes.get("/acte", async (c) => {
   const store = c.get("store");
   const list = query.yearInvalid
     ? { items: [], total: 0, page: 1, pages: 1 }
-    : listFromIndex(await store.actIndex(), filter);
+    : await store.listActs(filter);
   return c.html(renderActs(query, list), query.yearInvalid ? 400 : 200);
 });

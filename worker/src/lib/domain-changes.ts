@@ -65,9 +65,7 @@ export const domainActs = (store: Store) => store.actsByPath(DOMAINS.flatMap((do
 
 /** Sitemap paths of the index, the domain pages and their months. */
 export async function domainSitemapPaths(store: Store): Promise<string[]> {
-  // The sitemap must not touch D1, so the domain acts come from the (build-keyed) R2 index.
-  const wanted = new Set(DOMAINS.flatMap((domain) => domain.acts));
-  const acts = new Map((await store.actIndex()).filter((entry) => wanted.has(entry.path)).map((entry) => [entry.path, entry]));
+  const acts = await domainActs(store);
   const paths: string[] = [];
   for (const domain of DOMAINS) {
     const months = await domainMonths(store, acts, domain);

@@ -40,6 +40,8 @@ const ROBOTS = `User-agent: *
 Allow: /
 Disallow: /cauta
 Disallow: /*/compara/
+Disallow: /acte?
+Disallow: /legislatie/
 
 ${TRAINING_BOTS}
 Sitemap: ${ORIGIN}/sitemap.xml

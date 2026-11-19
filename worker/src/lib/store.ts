@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from "hono";
+import { normalise } from "./citation";
 import { unmarkStopWords } from "./text";
 import type {
-  ActIndex,
   ActIndexEntry,
   ActObject,
   ArticleObject,
@@ -25,7 +25,6 @@ export type AppEnv = { Bindings: Env; Variables: { store: Store } };
 
 export interface Store {
   manifest(): Promise<Manifest>;
-  actIndex(): Promise<ActIndexEntry[]>;
   act(path: string): Promise<ActObject | null>;
   article(path: string, file: string): Promise<ArticleObject | null>;
   law(key: string): Promise<LawObject | null>;
@@ -44,6 +43,10 @@ export interface Store {
   actsByPath(paths: readonly string[]): Promise<Map<string, ActIndexEntry>>;
   /** Number of acts per kind, from D1; memoised for the life of the build. */
   kindCounts(): Promise<Map<string, number>>;
+  /** One page of /acte with the exact total: two bounded D1 queries. */
+  listActs(filter: ActFilter): Promise<ActList>;
+  /** A page of the acts of one kind, newest first, leaving out the given paths (at most 90). */
+  actsOfKind(kind: string, exclude: readonly string[], limit: number, offset: number): Promise<ActIndexEntry[]>;
   actRulings(path: string): Promise<ArticleRuling[]>;
 }
 
@@ -107,7 +110,6 @@ export interface SitemapEntry {
 }
 
 const MANIFEST_KEY = "manifest.json";
-const INDEX_KEY = "acts/index.json";
 
 async function readJson<T>(bucket: R2Bucket, key: string): Promise<T | null> {
   const object = await bucket.get(key);
@@ -213,7 +215,6 @@ class BuildMemo<T> {
 }
 
 const manifestMemo = new Memo<Manifest>();
-const indexMemo = new BuildMemo<ActIndexEntry[]>();
 const kindsMemo = new BuildMemo<Map<string, number>>();
 
 /** D1 allows 100 bound parameters per query; stay well below. */
@@ -231,10 +232,25 @@ interface ActRow {
   articles: number | null;
 }
 
+const FOLD: [string, string][] = [["ăĂ", "a"], ["âÂ", "a"], ["îÎ", "i"], ["șȘşŞ", "s"], ["țȚţŢ", "t"]];
+
+/** SQL expression: the column lowercased without Romanian diacritics (SQLite's lower() is ASCII-only). */
+function folded(column: string): string {
+  let expression = `lower(${column})`;
+  for (const [letters, plain] of FOLD) for (const letter of letters) expression = `replace(${expression}, '${letter}', '${plain}')`;
+  return expression;
+}
+
+const FOLDED_NAME = `(${folded("COALESCE(title, '')")} || ' ' || ${folded("COALESCE(short, '')")})`;
+
+interface ListRow extends ActRow {
+  year: number | null;
+  number: string | null;
+}
+
 /** For tests: forget what this isolate has memoised. */
 export function resetStoreCache(): void {
   manifestMemo.reset();
-  indexMemo.reset();
   kindsMemo.reset();
 }
 
@@ -249,31 +265,10 @@ export function createStore(env: Env): Store {
       }),
     );
 
-  const actIndex = (): Promise<ActIndexEntry[]> =>
-    manifest().then((current) =>
-      indexMemo.get(current.build, async () => {
-        const found = await readJson<ActIndex>(env.DATA, INDEX_KEY);
-        return found !== null
-          ? found.acts
-          : current.acts.map((act) => ({
-              path: act.path,
-              alias: act.alias,
-              title: act.title,
-              short: act.short,
-              kind: act.path.split("/")[0] ?? "",
-              status: act.status,
-              from: act.from ?? null,
-              latest: act.latest,
-              articles: act.articles ?? 0,
-            }));
-      }),
-    );
-
   const readObject = <T>(key: string): Promise<T | null> => readJson<T>(env.DATA, key);
 
   return {
     manifest,
-    actIndex,
     act: (path) => readObject<ActObject>(`acts/${path}/act.json`),
     article: (path, file) => readObject<ArticleObject>(`acts/${path}/art/${file}.json`),
     law: (key) => readObject<LawObject>(`laws/${key}.json`),
@@ -422,6 +417,88 @@ export function createStore(env: Env): Store {
         }
       }
       return found;
+    },
+
+    async listActs(filter) {
+      const where: string[] = [];
+      const values: (string | number)[] = [];
+      if (filter.kind !== undefined) {
+        where.push(`kind = ?${values.push(filter.kind)}`);
+      }
+      if (filter.year !== undefined) {
+        where.push(`year = ?${values.push(filter.year)}`);
+      }
+      if (filter.status === "in-force") where.push("status = 'in force'");
+      if (filter.status === "repealed") where.push("status LIKE 'repealed%'");
+      const q = normalise(filter.q ?? "");
+      if (q !== "") {
+        const like = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+        const text = `${FOLDED_NAME} LIKE ?${values.push(like)} ESCAPE '\\'`;
+        if (/^[0-9]+$/.test(q)) where.push(`(number = ?${values.push(q)} OR ${text})`);
+        else where.push(text);
+      }
+      const clause = where.length === 0 ? "" : `WHERE ${where.join(" AND ")}`;
+      const pageQuery = (page: number) =>
+        env.DB.prepare(
+          `SELECT path, alias, title, short, kind, status, year, number, articles FROM acts ${clause}
+            ORDER BY year DESC, CAST(number AS INTEGER) DESC, path
+            LIMIT ${ACTS_PAGE} OFFSET ${(page - 1) * ACTS_PAGE}`,
+        ).bind(...values);
+      const requested = Math.max(1, Math.floor(filter.page) || 1);
+      // With no filter or only a kind the total is the memoised per-build count; otherwise one COUNT(*).
+      let total: number;
+      let first: { results: ListRow[] };
+      if (where.length === 0 || (filter.kind !== undefined && where.length === 1)) {
+        const kinds = await this.kindCounts();
+        total = filter.kind === undefined ? [...kinds.values()].reduce((sum, n) => sum + n, 0) : (kinds.get(filter.kind) ?? 0);
+        first = await pageQuery(requested).all<ListRow>();
+      } else {
+        const count = env.DB.prepare(`SELECT COUNT(*) AS total FROM acts ${clause}`).bind(...values);
+        const [counted, firstPage] = await env.DB.batch<{ total: number } & ListRow>([count, pageQuery(requested)]);
+        total = (counted!.results[0] as { total: number } | undefined)?.total ?? 0;
+        first = firstPage as { results: ListRow[] };
+      }
+      const pages = Math.max(1, Math.ceil(total / ACTS_PAGE));
+      const page = Math.min(requested, pages);
+      const rows = page === requested ? first!.results : (await pageQuery(page).all<ListRow>()).results;
+      return {
+        items: rows.map((row) => ({
+          path: row.path,
+          alias: row.alias,
+          kind: row.kind ?? "",
+          title: row.title ?? "",
+          short: row.short,
+          status: row.status ?? "",
+          year: row.year,
+          number: row.number === null || row.number === "" ? null : row.number,
+          articles: row.articles,
+        })),
+        total,
+        page,
+        pages,
+      };
+    },
+
+    async actsOfKind(kind, exclude, limit, offset) {
+      const { results } = await env.DB.prepare(
+        `SELECT path, alias, title, short, kind, status, from_date, latest, articles
+           FROM acts WHERE kind = ?1 ${exclude.length === 0 ? "" : `AND path NOT IN (${exclude.map((_, i) => `?${i + 4}`).join(",")})`}
+          ORDER BY year DESC, CAST(number AS INTEGER) DESC, path
+          LIMIT ?2 OFFSET ?3`,
+      )
+        .bind(kind, limit, offset, ...exclude)
+        .all<ActRow>();
+      return results.map((row) => ({
+        path: row.path,
+        alias: row.alias,
+        title: row.title ?? "",
+        short: row.short,
+        kind: row.kind ?? "",
+        status: row.status ?? "",
+        from: row.from_date,
+        latest: row.latest ?? "",
+        articles: row.articles ?? 0,
+      }));
     },
 
     async kindCounts() {

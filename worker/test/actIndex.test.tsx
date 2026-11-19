@@ -2,9 +2,9 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it } from "vitest";
 import app from "../src/index";
-import { createStore, resetStoreCache } from "../src/lib/store";
+import { createStore } from "../src/lib/store";
 import type { ActIndexEntry } from "../src/lib/types";
-import { putActs, removeObject, replaceObject } from "./support";
+import { putActs } from "./support";
 
 const get = (path: string) => exports.default.fetch(`https://example.com${path}`, { redirect: "manual" });
 const page = async (path: string) => (await get(path)).text();
@@ -30,8 +30,6 @@ const entry = (path: string, kind: string, extra: Partial<ActIndexEntry> = {}): 
 const OUG_COUNT = 120;
 
 async function withIndex(extra: ActIndexEntry[]): Promise<void> {
-  const acts = await createStore(env).actIndex();
-  restores.push(await replaceObject("acts/index.json", { schema: "textdelege/act-index/1", acts: [...acts, ...extra] }));
   restores.push(await putActs(extra));
 }
 
@@ -60,66 +58,39 @@ function countingEnv() {
 
 const context = { waitUntil: () => {}, passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
 
-describe("store.actIndex", () => {
-  it("reads the index object once per store", async () => {
-    const { reads, env: counted } = countingEnv();
-    const store = createStore(counted);
-    const [first, second] = await Promise.all([store.actIndex(), store.actIndex()]);
-    expect(first).toBe(second);
-    expect(reads.filter((key) => key === "acts/index.json")).toHaveLength(1);
-    expect(first.map((act) => act.path)).toContain("lege/2009/287");
-  });
-
-  it("falls back to the acts of the manifest when the index object is missing", async () => {
-    restores.push(await removeObject("acts/index.json"));
-    const store = createStore(env);
-    const manifest = await store.manifest();
-    const index = await store.actIndex();
-    expect(index.map((act) => act.path)).toEqual(manifest.acts.map((act) => act.path));
-    expect(index[0]).toMatchObject({ kind: "lege", alias: manifest.acts[0]!.alias, title: manifest.acts[0]!.title });
-    expect(await store.resolveAlias("codul-civil")).toBe("lege/2009/287");
-  });
-
-  it("is kept for the life of the isolate while the build is unchanged, and re-read when the build changes", async () => {
-    const { reads, env: counted } = countingEnv();
-    const first = await createStore(counted).actIndex();
-    const second = await createStore(counted).actIndex();
-    expect(second).toBe(first);
-    expect(reads.filter((key) => key === "acts/index.json")).toHaveLength(1);
-
-    const manifest = structuredClone(await createStore(env).manifest());
-    manifest.build = `${manifest.build}-next`;
-    restores.push(await replaceObject("manifest.json", manifest));
-    const { reads: nextReads, env: nextEnv } = countingEnv();
-    const third = await createStore(nextEnv).actIndex();
-    expect(third).not.toBe(first);
-    expect(nextReads.filter((key) => key === "acts/index.json")).toHaveLength(1);
-  });
-
-  it("does not keep a failed read", async () => {
-    const removed = await removeObject("manifest.json");
-    const store = createStore(env);
-    await expect(store.actIndex()).rejects.toThrow();
-    await removed();
-    resetStoreCache();
-    expect((await store.actIndex()).map((act) => act.path)).toContain("lege/2009/287");
-  });
-
-  it("is not read for a page addressed by an alias, a search or the home page", async () => {
-    for (const path of ["/codul-civil/art-1", "/codul-civil", "/cauta?q=text", "/", "/cauta?q=Codul%20civil"]) {
+describe("routes that once read the act index", () => {
+  it("never read acts/index.json, and read the manifest once", async () => {
+    await withIndex(others);
+    const paths = [
+      "/acte",
+      "/acte?tip=lege&an=2003&q=munc",
+      "/legislatie/2019-01-01",
+      "/legislatie/2019-01-01?tip=oug&pagina=2",
+      "/modificari",
+      "/modificari?act=codul-civil",
+      "/modificari?act=lege/1990/31",
+      "/modificari?alt=Legea%2031%2F1990",
+      "/modificari/lege/1990/31",
+      "/modificari.atom",
+      "/sitemap.xml",
+      "/sitemap-1.xml",
+      "/sitemap-2.xml",
+      "/codul-civil/art-1",
+      "/cauta?q=text",
+      "/",
+    ];
+    for (const path of paths) {
       const { reads, env: counted } = countingEnv();
-      const response = await app.fetch(new Request(`https://example.com${path}?nocache=${path.length}`), counted, context);
-      expect(response.status, path).toBeLessThan(400);
+      const response = await app.fetch(new Request(`https://example.com${path}${path.includes("?") ? "&" : "?"}nocache=${path.length}`), counted, context);
+      expect(response.status, path).toBeLessThan(500);
+      await response.text();
       expect(reads, path).not.toContain("acts/index.json");
+      expect(reads.filter((key) => key === "manifest.json").length, path).toBeLessThanOrEqual(1);
     }
   });
 
-  it("is read once for a whole page request", async () => {
-    const { reads, env: counted } = countingEnv();
-    const response = await app.fetch(new Request("https://example.com/legislatie/2019-01-01?once=1"), counted, context);
-    expect(response.status).toBe(200);
-    expect(reads.filter((key) => key === "acts/index.json")).toHaveLength(1);
-    expect(reads.filter((key) => key === "manifest.json")).toHaveLength(1);
+  it("is not in the store any more", () => {
+    expect("actIndex" in createStore(env)).toBe(false);
   });
 });
 

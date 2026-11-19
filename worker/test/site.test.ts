@@ -15,7 +15,7 @@ describe("robots.txt", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("text/plain; charset=utf-8");
     const text = await response.text();
-    expect(text.startsWith("User-agent: *\nAllow: /\nDisallow: /cauta\nDisallow: /*/compara/\n\n")).toBe(true);
+    expect(text.startsWith("User-agent: *\nAllow: /\nDisallow: /cauta\nDisallow: /*/compara/\nDisallow: /acte?\nDisallow: /legislatie/\n\n")).toBe(true);
     expect(text.endsWith("\nSitemap: https://textdelege.ro/sitemap.xml\n")).toBe(true);
   });
 
@@ -89,7 +89,11 @@ describe("sitemaps from the build", () => {
     const broken = new Proxy(env.DB, {
       get(target, property) {
         if (property !== "prepare") return Reflect.get(target, property, target);
-        return () => {
+        // The one allowed query: the bounded lookup of the domain acts, for the month pages on the last page.
+        return (sql: string) => {
+          if (/^SELECT path, alias, title, short, kind, status, from_date, latest, articles\s+FROM acts WHERE path IN/.test(sql)) {
+            return (Reflect.get(target, property, target) as (sql: string) => unknown).call(target, sql);
+          }
           throw new Error("D1_ERROR: the sitemap must not touch D1");
         };
       },
