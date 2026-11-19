@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { type AppEnv, NoBuildError, type SitemapEntry, type Store } from "../lib/store";
+import { BLOCKED_BOTS, OPT_OUT_TOKENS } from "../lib/bots";
 import { domainSitemapPaths } from "../lib/domain-changes"; /* domain-changes */
 import { actUrl, articleUrl } from "../lib/urls";
 import { ORIGIN } from "../views/layout";
@@ -33,11 +34,14 @@ export const SITEMAP_SIZE = 50000;
 
 const FIXED_PAGES = ["/", "/modificari", "/acte", "/despre", "/legenda", "/legislatie"];
 
+const TRAINING_BOTS = [...BLOCKED_BOTS, ...OPT_OUT_TOKENS].map((name) => `User-agent: ${name}\nDisallow: /\n`).join("\n");
+
 const ROBOTS = `User-agent: *
 Allow: /
 Disallow: /cauta
 Disallow: /*/compara/
 
+${TRAINING_BOTS}
 Sitemap: ${ORIGIN}/sitemap.xml
 `;
 

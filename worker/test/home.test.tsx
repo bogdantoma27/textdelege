@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import app from "../src/index";
 import { createStore } from "../src/lib/store";
 import type { ActIndexEntry, ChangeItem, Manifest } from "../src/lib/types";
-import { removeObject, replaceObject } from "./support";
+import { putActs, removeObject, replaceObject } from "./support";
 
 const get = (path: string, init?: RequestInit) =>
   exports.default.fetch(`https://example.com${path}`, { redirect: "manual", ...init });
@@ -28,9 +28,8 @@ async function patchSite(patch: (site: { items: ChangeItem[]; upcoming: ChangeIt
   restores.push(await replaceObject("changes/site.json", site));
 }
 
-async function patchIndex(patch: (acts: ActIndexEntry[]) => ActIndexEntry[]): Promise<void> {
-  const acts = patch(structuredClone(await createStore(env).actIndex()));
-  restores.push(await replaceObject("acts/index.json", { schema: "textdelege/act-index/1", acts }));
+async function addActs(acts: ActIndexEntry[], replace = false): Promise<void> {
+  restores.push(await putActs(acts, replace));
 }
 
 const entry = (path: string, kind: string, extra: Partial<ActIndexEntry> = {}): ActIndexEntry => ({
@@ -313,11 +312,7 @@ describe("home", () => {
   });
 
   it("lists the popular laws that are in the act index and skips the others", async () => {
-    await patchIndex((acts) => [
-      ...acts,
-      entry("oug/2002/195", "oug"),
-      entry("lege/2014/85", "lege", { alias: "codul-insolventei" }),
-    ]);
+    await addActs([entry("oug/2002/195", "oug"), entry("lege/2014/85", "lege", { alias: "codul-insolventei" })]);
     const html = await page("/");
     const popular = html.slice(html.indexOf('id="populare-titlu"'), html.indexOf('class="home-kinds"'));
     expect(popular).toContain("Legi căutate des");
@@ -328,14 +323,14 @@ describe("home", () => {
   });
 
   it("counts the acts by type from the act index, links each count to the filtered list and leaves out empty types", async () => {
-    await patchIndex(() => [
+    await addActs([
       entry("lege/1990/1", "lege"),
       entry("lege/1990/2", "lege"),
       entry("oug/2002/1", "oug"),
       ...Array.from({ length: 1200 }, (_, i) => entry(`og/2000/${i + 1}`, "og")),
       entry("hg/2000/1", "hg"),
       entry("decret/1990/1", "decret"),
-    ]);
+    ], true);
     const html = await page("/");
     const line = /<p class="home-kinds"[^>]*>(.*?)<\/p>/s.exec(html)?.[1];
     expect(line).toBe(

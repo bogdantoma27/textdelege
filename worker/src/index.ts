@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { BLOCKED_BODY, isBlockedBot } from "./lib/bots";
 import { pageCache, securityHeaders } from "./lib/http";
 import { withSources } from "./lib/outages";
 import { type AppEnv, NoBuildError, withStore } from "./lib/store";
@@ -18,6 +19,18 @@ import { errorHandler, notFoundHandler, siteRoutes } from "./routes/site";
 import { ORIGIN } from "./views/layout";
 
 const app = new Hono<AppEnv>();
+
+// First of all: training crawlers get a tiny cacheable refusal, with no store, cache or database access.
+app.use("*", async (c, next) => {
+  if (c.req.path !== "/robots.txt" && isBlockedBot(c.req.header("user-agent"))) {
+    return c.body(BLOCKED_BODY, 403, {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "public, max-age=86400",
+    });
+  }
+  await next();
+});
+
 const HOST = new URL(ORIGIN).host;
 
 app.use("*", async (c, next) => {

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { pageNumber } from "../lib/act";
 import type { AppEnv } from "../lib/store";
 import { lawKeyFromActRef, parsePath } from "../lib/urls";
-import { actNames } from "../views/changes";
+import { namesOf } from "../views/changes";
 import { renderLaw } from "../views/law";
 
 export const lawRoutes = new Hono<AppEnv>();
@@ -17,6 +17,6 @@ lawRoutes.get("*", async (c, next) => {
   const law = await store.law(key);
   if (law === null) return c.notFound();
 
-  const index = await store.actIndex();
-  return c.html(renderLaw(law, actNames(index), pageNumber(c.req.query("pagina") ?? null)));
+  const names = await namesOf(store, law.changes.map((change) => change.act_path));
+  return c.html(renderLaw(law, names, pageNumber(c.req.query("pagina") ?? null)));
 });

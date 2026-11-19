@@ -7,20 +7,21 @@ export async function resolveAct(store: Store, actRef: string): Promise<ActObjec
   return path === null ? null : store.act(path);
 }
 
-export function citedAct(index: ActIndexEntry[], citation: Citation): ActIndexEntry | null {
+export async function citedAct(store: Store, citation: Citation): Promise<ActIndexEntry | null> {
   const { alias, kind, chamber, number, year } = citation.act;
-  if (alias !== undefined) return index.find((act) => act.alias === alias) ?? null;
+  if (alias !== undefined) {
+    const path = await store.resolveAlias(alias);
+    return path === null ? null : ((await store.actsByPath([path])).get(path) ?? null);
+  }
   if (kind === "hotarare-parlament" && chamber === undefined) {
-    const found = index.filter(
-      (act) => act.path === `${kind}/camera/${year}/${number}` || act.path === `${kind}/senat/${year}/${number}`,
-    );
-    return found.length === 1 ? (found[0] ?? null) : null;
+    const found = await store.actsByPath([`${kind}/camera/${year}/${number}`, `${kind}/senat/${year}/${number}`]);
+    return found.size === 1 ? ([...found.values()][0] ?? null) : null;
   }
   const path = `${kind}/${chamber === undefined ? "" : `${chamber}/`}${year}/${number}`;
-  return index.find((act) => act.path === path) ?? null;
+  return (await store.actsByPath([path])).get(path) ?? null;
 }
 
-export function findCitedAct(index: ActIndexEntry[], input: string): ActIndexEntry | null {
+export async function findCitedAct(store: Store, input: string): Promise<ActIndexEntry | null> {
   const citation = parseCitation(input);
-  return citation === null ? null : citedAct(index, citation);
+  return citation === null ? null : citedAct(store, citation);
 }

@@ -1,15 +1,15 @@
 import { Hono } from "hono";
 import { type Citation, citationUrl, parseCitation } from "../lib/citation";
 import { COUNT_CAP, type AppEnv, type Store } from "../lib/store";
-import type { ActIndexEntry } from "../lib/types";
+import type { ActIndexEntry, SearchHit } from "../lib/types";
 import { citedAct } from "../lib/resolve";
 import { lawKeyFromActRef, lawUrlFromKey } from "../lib/urls";
 import { actNames } from "../views/changes";
 import { pageNumber } from "../lib/act";
 import { HITS_LIMIT, MAX_QUERY, renderSearch } from "../views/search";
 
-function selectedUrl(index: ActIndexEntry[], citation: Citation): string | null {
-  const found = citedAct(index, citation);
+async function selectedUrl(store: Store, citation: Citation): Promise<string | null> {
+  const found = await citedAct(store, citation);
   if (found === null) return null;
   const chamber = found.path.split("/")[1];
   const resolved =
@@ -27,18 +27,6 @@ async function amendingActUrl(store: Store, citation: Citation): Promise<string 
   return lawUrlFromKey(key);
 }
 
-// Building a map of the whole act index costs real CPU; do it once per loaded index, not per request.
-const byPath = new WeakMap<ActIndexEntry[], Map<string, ActIndexEntry>>();
-
-function actsByPath(index: ActIndexEntry[]): Map<string, ActIndexEntry> {
-  let acts = byPath.get(index);
-  if (acts === undefined) {
-    acts = new Map(index.map((entry) => [entry.path, entry]));
-    byPath.set(index, acts);
-  }
-  return acts;
-}
-
 export const LIVE_LIMIT = 8;
 
 export const searchRoutes = new Hono<AppEnv>();
@@ -47,21 +35,24 @@ searchRoutes.get("/cauta", async (c) => {
   const query = (c.req.query("q") ?? "").slice(0, MAX_QUERY).trim();
   const inForce = c.req.query("in_force") === "1";
   const store = c.get("store");
-  const index = await store.actIndex();
-  const names = actNames(index);
-  const acts = actsByPath(index);
+  await store.manifest(); // 503 when no build is published
+  const noActs = { names: actNames([]), acts: new Map<string, ActIndexEntry>() };
+  const withActs = async (hits: SearchHit[]) => {
+    const acts = await store.actsByPath(hits.map((hit) => hit.actPath));
+    return { names: actNames([...acts.values()]), acts };
+  };
 
-  if (query === "") return c.html(renderSearch({ query, inForce, hits: null, total: 0, over: false, live: false, page: 1, pages: 1, names, acts }));
+  if (query === "") return c.html(renderSearch({ query, inForce, hits: null, total: 0, over: false, live: false, page: 1, pages: 1, ...noActs }));
 
   const citation = parseCitation(query);
-  const target = citation === null ? null : selectedUrl(index, citation);
+  const target = citation === null ? null : await selectedUrl(store, citation);
   if (target !== null) return c.redirect(target, 302);
   const law = citation === null ? null : await amendingActUrl(store, citation);
   if (law !== null) return c.redirect(law, 302);
 
   if (c.req.query("live") === "1") {
     const hits = await store.search(query, inForce, LIVE_LIMIT);
-    return c.html(renderSearch({ query, inForce, hits, total: hits.length, over: false, live: true, page: 1, pages: 1, names, acts }));
+    return c.html(renderSearch({ query, inForce, hits, total: hits.length, over: false, live: true, page: 1, pages: 1, ...(await withActs(hits)) }));
   }
 
   const counted = await store.searchCount(query, inForce);
@@ -70,5 +61,5 @@ searchRoutes.get("/cauta", async (c) => {
   const pages = Math.max(1, Math.ceil(total / HITS_LIMIT));
   const page = Math.min(pageNumber(c.req.query("pagina") ?? null), pages);
   const hits = total === 0 ? [] : await store.search(query, inForce, HITS_LIMIT, (page - 1) * HITS_LIMIT);
-  return c.html(renderSearch({ query, inForce, hits, total, over, live: false, page, pages, names, acts }));
+  return c.html(renderSearch({ query, inForce, hits, total, over, live: false, page, pages, ...(await withActs(hits)) }));
 });

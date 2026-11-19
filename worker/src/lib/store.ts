@@ -40,6 +40,10 @@ export interface Store {
   legacySitemapTotal(): Promise<number>;
   legacySitemapEntries(limit: number, offset: number): Promise<SitemapEntry[]>;
   resolveAlias(alias: string): Promise<string | null>;
+  /** The named acts from D1 (at most 50 per query); paths that are not acts are absent from the map. */
+  actsByPath(paths: readonly string[]): Promise<Map<string, ActIndexEntry>>;
+  /** Number of acts per kind, from D1; memoised for the life of the build. */
+  kindCounts(): Promise<Map<string, number>>;
   actRulings(path: string): Promise<ArticleRuling[]>;
 }
 
@@ -165,7 +169,7 @@ interface SearchRow {
   snippet: string;
 }
 
-/** How long an isolate keeps the manifest and the act index before it reads them from R2 again. */
+/** How long an isolate keeps the manifest before it reads it from R2 again. */
 export const MEMO_MS = 60_000;
 
 class Memo<T> {
@@ -188,13 +192,50 @@ class Memo<T> {
   }
 }
 
+/** Keeps a value for as long as the manifest's build id is unchanged; a failed read is not kept. */
+class BuildMemo<T> {
+  private entry: { build: string; value: Promise<T> } | undefined;
+
+  get(build: string, read: () => Promise<T>): Promise<T> {
+    const held = this.entry;
+    if (held !== undefined && held.build === build) return held.value;
+    const entry = { build, value: read() };
+    this.entry = entry;
+    entry.value.catch(() => {
+      if (this.entry === entry) this.entry = undefined;
+    });
+    return entry.value;
+  }
+
+  reset(): void {
+    this.entry = undefined;
+  }
+}
+
 const manifestMemo = new Memo<Manifest>();
-const indexMemo = new Memo<ActIndexEntry[]>();
+const indexMemo = new BuildMemo<ActIndexEntry[]>();
+const kindsMemo = new BuildMemo<Map<string, number>>();
+
+/** D1 allows 100 bound parameters per query; stay well below. */
+export const IN_CHUNK = 50;
+
+interface ActRow {
+  path: string;
+  alias: string | null;
+  title: string | null;
+  short: string | null;
+  kind: string | null;
+  status: string | null;
+  from_date: string | null;
+  latest: string | null;
+  articles: number | null;
+}
 
 /** For tests: forget what this isolate has memoised. */
 export function resetStoreCache(): void {
   manifestMemo.reset();
   indexMemo.reset();
+  kindsMemo.reset();
 }
 
 export function createStore(env: Env): Store {
@@ -209,8 +250,8 @@ export function createStore(env: Env): Store {
     );
 
   const actIndex = (): Promise<ActIndexEntry[]> =>
-    indexMemo.get(() =>
-      manifest().then(async (current) => {
+    manifest().then((current) =>
+      indexMemo.get(current.build, async () => {
         const found = await readJson<ActIndex>(env.DATA, INDEX_KEY);
         return found !== null
           ? found.acts
@@ -346,8 +387,52 @@ export function createStore(env: Env): Store {
     },
 
     async resolveAlias(alias) {
-      const acts = await actIndex();
+      const { acts } = await manifest();
       return acts.find((act) => act.alias === alias)?.path ?? null;
+    },
+
+    async actsByPath(paths) {
+      const unique = [...new Set(paths)];
+      const found = new Map<string, ActIndexEntry>();
+      if (unique.length === 0) return found;
+      const statements = [];
+      for (let at = 0; at < unique.length; at += IN_CHUNK) {
+        const chunk = unique.slice(at, at + IN_CHUNK);
+        statements.push(
+          env.DB.prepare(
+            `SELECT path, alias, title, short, kind, status, from_date, latest, articles
+               FROM acts WHERE path IN (${chunk.map(() => "?").join(",")})`,
+          ).bind(...chunk),
+        );
+      }
+      const batches = statements.length === 1 ? [await statements[0]!.all<ActRow>()] : await env.DB.batch<ActRow>(statements);
+      for (const { results } of batches) {
+        for (const row of results) {
+          found.set(row.path, {
+            path: row.path,
+            alias: row.alias,
+            title: row.title ?? "",
+            short: row.short,
+            kind: row.kind ?? "",
+            status: row.status ?? "",
+            from: row.from_date,
+            latest: row.latest ?? "",
+            articles: row.articles ?? 0,
+          });
+        }
+      }
+      return found;
+    },
+
+    async kindCounts() {
+      const current = await manifest();
+      return kindsMemo.get(current.build, async () => {
+        const { results } = await env.DB.prepare("SELECT kind, COUNT(*) AS n FROM acts GROUP BY kind").all<{
+          kind: string | null;
+          n: number;
+        }>();
+        return new Map(results.map((row) => [row.kind ?? "", row.n]));
+      });
     },
   };
 }

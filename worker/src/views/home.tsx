@@ -12,7 +12,7 @@ import { LawLink, StatusBadge, grouped } from "./shared";
 const RECENT = 6;
 const UPCOMING = 4;
 
-/** Laws people look for by a name the act itself does not carry. Entries missing from the act index are skipped. */
+/** Laws people look for by a name the act itself does not carry. Entries missing from the acts table are skipped. */
 export const POPULAR: { path: string; name: string }[] = [
   { path: "oug/2002/195", name: "Codul rutier" },
   { path: "lege/2014/85", name: "Codul insolvenței" },
@@ -281,13 +281,14 @@ function Recent({ items, names }: { items: ChangeItem[]; names: ActNames }) {
   );
 }
 
-function Kinds({ index }: { index: ActIndexEntry[] }) {
-  const count = (kind: string) => index.filter((entry) => entry.kind === kind).length;
+function Kinds({ kinds }: { kinds: Map<string, number> }) {
+  const count = (kind: string) => kinds.get(kind) ?? 0;
+  const total = [...kinds.values()].reduce((sum, n) => sum + n, 0);
   const links = [
     ...KIND_LINKS.map(({ kind, label }) => ({ kind, label, n: count(kind) }))
       .filter(({ n }) => n > 0)
       .map(({ kind, label, n }) => ({ href: `/acte?tip=${kind}`, text: `${t(label)} (${grouped(n)})` })),
-    { href: "/acte", text: `${t("homeAllActs")} (${grouped(index.length)})` },
+    { href: "/acte", text: `${t("homeAllActs")} (${grouped(total)})` },
   ];
   return (
     <p class="home-kinds" aria-label={t("homeKindsLabel")}>
@@ -301,8 +302,7 @@ function Kinds({ index }: { index: ActIndexEntry[] }) {
   );
 }
 
-function Popular({ index }: { index: ActIndexEntry[] }) {
-  const byPath = new Map(index.map((entry) => [entry.path, entry]));
+function Popular({ byPath, kinds }: { byPath: Map<string, ActIndexEntry>; kinds: Map<string, number> }) {
   const shown = POPULAR.flatMap(({ path, name }) => {
     const entry = byPath.get(path);
     return entry === undefined ? [] : [{ name, href: actUrl(entry.alias ?? entry.path) }];
@@ -319,7 +319,7 @@ function Popular({ index }: { index: ActIndexEntry[] }) {
           ))}
         </ul>
       )}
-      <Kinds index={index} />
+      <Kinds kinds={kinds} />
     </section>
   );
 }
@@ -329,7 +329,8 @@ export function renderHome(
   manifest: Manifest,
   changes: ChangesObject | null,
   names: ActNames,
-  index: ActIndexEntry[] = [],
+  popular: Map<string, ActIndexEntry> = new Map(),
+  kinds: Map<string, number> = new Map(),
 ) {
   const acts = ordered(manifest.acts);
   const current = acts.filter(isCurrent);
@@ -379,7 +380,7 @@ export function renderHome(
             <CodeList acts={historical} now={ctx.now} id="coduri-istorice" tabbed hidden={!showHistorical} />
           )}
         </section>
-        <Popular index={index} />
+        <Popular byPath={popular} kinds={kinds} />
         <DateRow now={ctx.now} />
         <Facts manifest={manifest} />
       </section>

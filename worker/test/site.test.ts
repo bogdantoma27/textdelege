@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import app from "../src/index";
+import { BLOCKED_BOTS, OPT_OUT_TOKENS } from "../src/lib/bots";
 import { SITEMAP_SIZE } from "../src/routes/site";
 import { removeObject, replaceObject } from "./support";
 
@@ -13,9 +14,17 @@ describe("robots.txt", () => {
     const response = await get("/robots.txt");
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("text/plain; charset=utf-8");
-    expect(await response.text()).toBe(
-      "User-agent: *\nAllow: /\nDisallow: /cauta\nDisallow: /*/compara/\n\nSitemap: https://textdelege.ro/sitemap.xml\n",
-    );
+    const text = await response.text();
+    expect(text.startsWith("User-agent: *\nAllow: /\nDisallow: /cauta\nDisallow: /*/compara/\n\n")).toBe(true);
+    expect(text.endsWith("\nSitemap: https://textdelege.ro/sitemap.xml\n")).toBe(true);
+  });
+
+  it("opts the training crawlers and tokens out, and leaves search and user fetchers alone", async () => {
+    const text = await (await get("/robots.txt")).text();
+    for (const name of [...BLOCKED_BOTS, ...OPT_OUT_TOKENS]) expect(text).toContain(`User-agent: ${name}\nDisallow: /\n`);
+    for (const name of ["Googlebot", "bingbot", "OAI-SearchBot", "ChatGPT-User", "Claude-SearchBot", "PerplexityBot", "meta-externalfetcher"]) {
+      expect(text).not.toContain(`User-agent: ${name}\n`);
+    }
   });
 });
 

@@ -2,9 +2,9 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it } from "vitest";
 import app from "../src/index";
-import { createStore } from "../src/lib/store";
+import { createStore, resetStoreCache } from "../src/lib/store";
 import type { ActIndexEntry } from "../src/lib/types";
-import { removeObject, replaceObject } from "./support";
+import { putActs, removeObject, replaceObject } from "./support";
 
 const get = (path: string) => exports.default.fetch(`https://example.com${path}`, { redirect: "manual" });
 const page = async (path: string) => (await get(path)).text();
@@ -32,6 +32,7 @@ const OUG_COUNT = 120;
 async function withIndex(extra: ActIndexEntry[]): Promise<void> {
   const acts = await createStore(env).actIndex();
   restores.push(await replaceObject("acts/index.json", { schema: "textdelege/act-index/1", acts: [...acts, ...extra] }));
+  restores.push(await putActs(extra));
 }
 
 const others = [
@@ -79,12 +80,93 @@ describe("store.actIndex", () => {
     expect(await store.resolveAlias("codul-civil")).toBe("lege/2009/287");
   });
 
+  it("is kept for the life of the isolate while the build is unchanged, and re-read when the build changes", async () => {
+    const { reads, env: counted } = countingEnv();
+    const first = await createStore(counted).actIndex();
+    const second = await createStore(counted).actIndex();
+    expect(second).toBe(first);
+    expect(reads.filter((key) => key === "acts/index.json")).toHaveLength(1);
+
+    const manifest = structuredClone(await createStore(env).manifest());
+    manifest.build = `${manifest.build}-next`;
+    restores.push(await replaceObject("manifest.json", manifest));
+    const { reads: nextReads, env: nextEnv } = countingEnv();
+    const third = await createStore(nextEnv).actIndex();
+    expect(third).not.toBe(first);
+    expect(nextReads.filter((key) => key === "acts/index.json")).toHaveLength(1);
+  });
+
+  it("does not keep a failed read", async () => {
+    const removed = await removeObject("manifest.json");
+    const store = createStore(env);
+    await expect(store.actIndex()).rejects.toThrow();
+    await removed();
+    resetStoreCache();
+    expect((await store.actIndex()).map((act) => act.path)).toContain("lege/2009/287");
+  });
+
+  it("is not read for a page addressed by an alias, a search or the home page", async () => {
+    for (const path of ["/codul-civil/art-1", "/codul-civil", "/cauta?q=text", "/", "/cauta?q=Codul%20civil"]) {
+      const { reads, env: counted } = countingEnv();
+      const response = await app.fetch(new Request(`https://example.com${path}?nocache=${path.length}`), counted, context);
+      expect(response.status, path).toBeLessThan(400);
+      expect(reads, path).not.toContain("acts/index.json");
+    }
+  });
+
   it("is read once for a whole page request", async () => {
     const { reads, env: counted } = countingEnv();
     const response = await app.fetch(new Request("https://example.com/legislatie/2019-01-01?once=1"), counted, context);
     expect(response.status).toBe(200);
     expect(reads.filter((key) => key === "acts/index.json")).toHaveLength(1);
     expect(reads.filter((key) => key === "manifest.json")).toHaveLength(1);
+  });
+});
+
+describe("store.actsByPath", () => {
+  it("maps D1 rows to index entries, skips unknown paths and deduplicates", async () => {
+    const found = await createStore(env).actsByPath(["lege/2009/287", "lege/2009/287", "nu/1/1"]);
+    expect([...found.keys()]).toEqual(["lege/2009/287"]);
+    expect(found.get("lege/2009/287")).toEqual({
+      path: "lege/2009/287",
+      alias: "codul-civil",
+      title: "Legea nr. 287/2009",
+      short: "Codul civil",
+      kind: "lege",
+      status: "in force",
+      from: "2011-10-01",
+      latest: "2023-07-09",
+      articles: 2,
+    });
+    expect((await createStore(env).actsByPath([])).size).toBe(0);
+  });
+
+  it("splits long lists into queries of at most 50 parameters", async () => {
+    restores.push(await putActs(others));
+    const bound: number[] = [];
+    const spy = new Proxy(env.DB, {
+      get(target, property) {
+        const member = Reflect.get(target, property, target);
+        if (property !== "prepare") return typeof member === "function" ? member.bind(target) : member;
+        return (sql: string) => {
+          const statement = (member as (sql: string) => D1PreparedStatement).call(target, sql);
+          return new Proxy(statement, {
+            get(inner, name) {
+              const value = Reflect.get(inner, name, inner);
+              if (name !== "bind") return typeof value === "function" ? value.bind(inner) : value;
+              return (...args: unknown[]) => {
+                bound.push(args.length);
+                return (value as (...a: unknown[]) => unknown).apply(inner, args);
+              };
+            },
+          });
+        };
+      },
+    });
+    const paths = others.filter((act) => act.kind === "oug").map((act) => act.path);
+    const found = await createStore({ ...env, DB: spy } as typeof env).actsByPath(paths);
+    expect(found.size).toBe(OUG_COUNT);
+    expect(bound).toEqual([50, 50, 20]);
   });
 });
 

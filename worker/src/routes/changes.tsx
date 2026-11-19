@@ -136,7 +136,7 @@ changesRoutes.get("*", async (c, next) => {
   const params = new URL(c.req.url).searchParams;
   const filters = parseFilters(params, refs);
   const alt = route.actRef === null ? (params.get("alt") ?? "").trim().slice(0, MAX_QUERY).trim() : "";
-  const cited = alt === "" ? null : findCitedAct(index, alt);
+  const cited = alt === "" ? null : await findCitedAct(store, alt);
   if (cited !== null) filters.act = cited.alias ?? cited.path;
   const altInvalid = alt !== "" && cited === null;
   const actPath =

@@ -5,7 +5,7 @@ import { listFromIndex } from "../src/lib/act-list";
 import { articleLabel } from "../src/lib/article-label";
 import { parseCitation } from "../src/lib/citation";
 import { citedAct, findCitedAct } from "../src/lib/resolve";
-import { createStore } from "../src/lib/store";
+import { type Store, createStore } from "../src/lib/store";
 import { linkCrossReferences, linkableNumbers } from "../src/lib/text";
 import type { ActArticleEntry, ActIndexEntry, ActObject, ArticleObject } from "../src/lib/types";
 import { replaceObject } from "./support";
@@ -24,37 +24,44 @@ const entry = (path: string, title = "Titlu"): ActIndexEntry => ({
   articles: 1,
 });
 
+/** The two store methods a citation lookup uses, over a fixed list of acts. */
+const storeOf = (acts: ActIndexEntry[]) =>
+  ({
+    actsByPath: async (paths: readonly string[]) => new Map(acts.filter((act) => paths.includes(act.path)).map((act) => [act.path, act])),
+    resolveAlias: async (alias: string) => acts.find((act) => act.alias === alias)?.path ?? null,
+  }) as unknown as Store;
+
 describe("Parliament decision citations", () => {
-  const index = [
+  const index = storeOf([
     entry("hotarare-parlament/camera/1990/14"),
     entry("hotarare-parlament/senat/2005/3"),
     entry("hotarare-parlament/camera/2005/3"),
     entry("lege/1990/14"),
-  ];
+  ]);
 
-  it("finds the Chamber of Deputies decision", () => {
-    expect(findCitedAct(index, "Hotărârea Camerei Deputaților nr. 14/1990")?.path).toBe(
+  it("finds the Chamber of Deputies decision", async () => {
+    expect((await findCitedAct(index, "Hotărârea Camerei Deputaților nr. 14/1990"))?.path).toBe(
       "hotarare-parlament/camera/1990/14",
     );
   });
 
-  it("finds the Senate decision", () => {
-    expect(findCitedAct(index, "Hotărârea Senatului nr. 3/2005")?.path).toBe("hotarare-parlament/senat/2005/3");
+  it("finds the Senate decision", async () => {
+    expect((await findCitedAct(index, "Hotărârea Senatului nr. 3/2005"))?.path).toBe("hotarare-parlament/senat/2005/3");
   });
 
-  it("does not take the Chamber decision for the Senate one", () => {
-    expect(findCitedAct(index, "Hotărârea Senatului nr. 14/1990")).toBeNull();
+  it("does not take the Chamber decision for the Senate one", async () => {
+    expect(await findCitedAct(index, "Hotărârea Senatului nr. 14/1990")).toBeNull();
   });
 
-  it("resolves HP only when one chamber has the number", () => {
-    expect(findCitedAct(index, "HP 14/1990")?.path).toBe("hotarare-parlament/camera/1990/14");
-    expect(findCitedAct(index, "HP 3/2005")).toBeNull();
+  it("resolves HP only when one chamber has the number", async () => {
+    expect((await findCitedAct(index, "HP 14/1990"))?.path).toBe("hotarare-parlament/camera/1990/14");
+    expect(await findCitedAct(index, "HP 3/2005")).toBeNull();
     const citation = parseCitation("Hotărârea Parlamentului nr. 14/1990")!;
-    expect(citedAct(index, citation)?.path).toBe("hotarare-parlament/camera/1990/14");
+    expect((await citedAct(index, citation))?.path).toBe("hotarare-parlament/camera/1990/14");
   });
 
-  it("keeps plain numbered kinds working", () => {
-    expect(findCitedAct(index, "Legea nr. 14/1990")?.path).toBe("lege/1990/14");
+  it("keeps plain numbered kinds working", async () => {
+    expect((await findCitedAct(index, "Legea nr. 14/1990"))?.path).toBe("lege/1990/14");
   });
 });
 

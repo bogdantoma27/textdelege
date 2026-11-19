@@ -25,11 +25,9 @@ export const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
  * An act's object holds only its latest FEED_LIMIT applied changes, so when it is full its oldest month
  * may be cut off and is left out rather than shown incomplete.
  */
-export async function domainMonths(store: Store, index: ActIndexEntry[], domain: Domain): Promise<DomainMonth[]> {
+export async function domainMonths(store: Store, acts: Map<string, ActIndexEntry>, domain: Domain): Promise<DomainMonth[]> {
   const now = today();
-  const found = domain.acts
-    .map((path) => index.find((entry) => entry.path === path))
-    .filter((entry) => entry !== undefined);
+  const found = domain.acts.map((path) => acts.get(path)).filter((entry) => entry !== undefined);
   const loaded = await Promise.all(
     found.map(async (entry) => ({
       act: { path: entry.path, ref: entry.alias ?? entry.path, name: entry.short ?? entry.title },
@@ -62,12 +60,17 @@ export async function domainMonths(store: Store, index: ActIndexEntry[], domain:
   return [...byMonth.values()].sort((a, b) => b.month.localeCompare(a.month));
 }
 
+/** The acts of every domain, in one D1 lookup. */
+export const domainActs = (store: Store) => store.actsByPath(DOMAINS.flatMap((domain) => domain.acts));
+
 /** Sitemap paths of the index, the domain pages and their months. */
 export async function domainSitemapPaths(store: Store): Promise<string[]> {
-  const index = await store.actIndex();
+  // The sitemap must not touch D1, so the domain acts come from the (build-keyed) R2 index.
+  const wanted = new Set(DOMAINS.flatMap((domain) => domain.acts));
+  const acts = new Map((await store.actIndex()).filter((entry) => wanted.has(entry.path)).map((entry) => [entry.path, entry]));
   const paths: string[] = [];
   for (const domain of DOMAINS) {
-    const months = await domainMonths(store, index, domain);
+    const months = await domainMonths(store, acts, domain);
     if (months.length === 0) continue;
     paths.push(domainUrl(domain));
     for (const { month } of months) paths.push(monthUrl(domain, month));

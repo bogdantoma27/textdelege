@@ -5,7 +5,7 @@ import { parseDate, today } from "../lib/dates";
 import { resolveAct } from "../lib/resolve";
 import type { AppEnv } from "../lib/store";
 import { actUrl, lawKeyFromActRef, parsePath } from "../lib/urls";
-import { actNames } from "../views/changes";
+import { namesOf } from "../views/changes";
 import { type ActTab, renderAct } from "../views/act";
 import { changesToOthers } from "../views/law";
 import { Contents } from "../views/article-rails";
@@ -96,7 +96,7 @@ actRoutes.get("*", async (c, next) => {
   const key = tab === "text" && (ctx.page ?? 1) === 1 ? lawKeyFromActRef(act.path) : null;
   const stored = key === null ? null : await store.law(key);
   const law = stored === null ? null : changesToOthers(stored);
-  const made = law === null || law.changes.length === 0 ? undefined : { law, names: actNames(await store.actIndex()) };
+  const made = law === null || law.changes.length === 0 ? undefined : { law, names: await namesOf(store, law.changes.map((change) => change.act_path)) };
   const rulings = tab === "jurisprudenta" ? await store.actRulings(act.path) : undefined;
   return c.html(renderAct(ctx, act, tab, text, rulings, made), invalid === undefined ? 200 : 400);
 });

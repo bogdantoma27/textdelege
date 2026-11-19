@@ -1,3 +1,4 @@
+import type { Store } from "../lib/store";
 import { articleLabel } from "../lib/article-label";
 import type { Child } from "hono/jsx";
 import { t, tPlural } from "../text";
@@ -19,6 +20,11 @@ export function actNames(acts: (OrderedAct & { path: string })[]): ActNames {
   return new Map(
     acts.map((act) => [act.path, { ref: act.alias ?? act.path, name: act.short ?? act.title }]),
   );
+}
+
+/** Names of the acts at these paths, read from D1 (bounded lists only). */
+export async function namesOf(store: Store, paths: Iterable<string>): Promise<ActNames> {
+  return actNames([...(await store.actsByPath([...paths])).values()]);
 }
 
 const TABLE_LIMIT = 200;

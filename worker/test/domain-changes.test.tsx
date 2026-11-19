@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createStore } from "../src/lib/store";
 import type { ActIndexEntry, ChangeItem } from "../src/lib/types";
 import { env } from "cloudflare:test";
-import { replaceObject } from "./support";
+import { putActs, replaceObject } from "./support";
 
 const get = (path: string) => exports.default.fetch(`https://example.com${path}`, { redirect: "manual" });
 
@@ -26,9 +26,8 @@ const item = (extra: Partial<ChangeItem>): ChangeItem => ({
 
 async function seed(items: ChangeItem[], path = "lege/2015/227") {
   const store = createStore(env);
-  const index = structuredClone(await store.actIndex());
-  if (!index.some((act) => act.path === path)) {
-    index.push({
+  if (!(await store.actsByPath([path])).has(path)) {
+    const act: ActIndexEntry = {
       path,
       alias: path === "lege/2015/227" ? "codul-fiscal" : null,
       title: "Legea nr. 227/2015",
@@ -38,8 +37,11 @@ async function seed(items: ChangeItem[], path = "lege/2015/227") {
       from: "2016-01-01",
       latest: "2026-03-05",
       articles: 1,
-    } as ActIndexEntry);
-    restores.push(await replaceObject("acts/index.json", { schema: "textdelege/act-index/1", acts: index }));
+    };
+    // The pages read the acts from D1, the sitemap from the R2 index.
+    restores.push(await putActs([act]));
+    const index = structuredClone(await store.actIndex());
+    restores.push(await replaceObject("acts/index.json", { schema: "textdelege/act-index/1", acts: [...index, act] }));
   }
   restores.push(
     await replaceObject(`changes/acts/${path}.json`, {
