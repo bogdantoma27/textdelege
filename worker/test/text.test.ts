@@ -1,6 +1,6 @@
 import { jsx } from "hono/jsx";
 import { describe, expect, it } from "vitest";
-import { hangingParagraph, linkCrossReferences, parseUnit } from "../src/lib/text";
+import { hangingParagraph, linkCrossReferences, parseUnit, unmarkStopWords } from "../src/lib/text";
 
 describe("hangingParagraph", () => {
   it.each([
@@ -117,5 +117,17 @@ describe("linkCrossReferences", () => {
     expect(linkCrossReferences("niciun articol", { actRef: "x", date: null, articles })).toEqual([
       "niciun articol",
     ]);
+  });
+});
+
+describe("unmarkStopWords", () => {
+  const html = "<mark>Contractul</mark> <mark>de</mark> <mark>muncă</mark> <mark>și</mark> <mark>în</mark>";
+  it("keeps the marks on content words and drops them on stop-words, ignoring diacritics", () => {
+    expect(unmarkStopWords(html, "contractul de munca si în")).toBe(
+      "<mark>Contractul</mark> de <mark>muncă</mark> și în",
+    );
+  });
+  it("keeps every mark when the query is only stop-words", () => {
+    expect(unmarkStopWords("<mark>de</mark> <mark>la</mark>", "de la")).toBe("<mark>de</mark> <mark>la</mark>");
   });
 });

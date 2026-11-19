@@ -1,12 +1,13 @@
 import { articleLabel } from "../lib/article-label";
 import { t, tPlural } from "../text";
-import type { SearchHit } from "../lib/types";
+import { parseActStatus } from "../lib/status";
+import type { ActIndexEntry, SearchHit } from "../lib/types";
 import { articleUrl } from "../lib/urls";
 import type { ActNames } from "./changes";
 import { Breadcrumbs, PageNumbers } from "./components";
 import { Indexed } from "./indexed";
 import { Layout, ORIGIN } from "./layout";
-import { STATE_BADGE_ID, StatusBadge, grouped } from "./shared";
+import { BADGES, STATE_BADGE_ID, StatusBadge, grouped } from "./shared";
 
 export const HITS_LIMIT = 20;
 
@@ -61,10 +62,43 @@ function SearchBox(props: { query: string; inForce: boolean }) {
   );
 }
 
-function Hit({ hit, names }: { hit: SearchHit; names: ActNames }) {
+/** "Codul muncii (Legea nr. 53/2003)" -> "Legea nr. 53/2003"; only for acts that have a short name. */
+export function designation(entry: Pick<ActIndexEntry, "short" | "title">): string | null {
+  if (entry.short === null) return null;
+  return /\(([^()]+)\)\s*$/.exec(entry.title)?.[1]?.trim() || null;
+}
+
+function ActLine({ entry }: { entry: ActIndexEntry }) {
+  const { kind } = parseActStatus(entry.status);
+  const named = designation(entry);
+  const status =
+    kind === "in-force" ? (
+      <span class="st st-in">{t("searchActInForce")}</span>
+    ) : kind === "repealed" ? (
+      <span class="st st-out">{t("searchActRepealed")}</span>
+    ) : (
+      <span>
+        {t(
+          BADGES[
+            kind === "unconsolidated" ? "unconsolidated" : kind === "amending" ? "amending" : kind === "unchecked" ? "unchecked" : "notInForce"
+          ].label,
+        )}
+      </span>
+    );
+  return (
+    <p class="hit-act">
+      {named !== null && `${named} · `}
+      {status}
+    </p>
+  );
+}
+
+function Hit({ hit, names, acts }: { hit: SearchHit; names: ActNames; acts: Map<string, ActIndexEntry> }) {
   const act = names.get(hit.actPath) ?? { ref: hit.actPath, name: hit.actPath };
+  const entry = acts.get(hit.actPath);
   return (
     <li class="hit">
+      {entry !== undefined && <ActLine entry={entry} />}
       <h2 class="hit-head">
         <a href={articleUrl(act.ref, hit)}>
           {act.name}, <Indexed text={articleLabel(hit)} />
@@ -93,6 +127,7 @@ export interface SearchPage {
   page: number;
   pages: number;
   names: ActNames;
+  acts: Map<string, ActIndexEntry>;
 }
 
 export function renderSearch(page: SearchPage) {
@@ -150,7 +185,7 @@ export function renderSearch(page: SearchPage) {
             )}
             <ul class="plain hits">
               {hits.map((hit) => (
-                <Hit hit={hit} names={page.names} />
+                <Hit hit={hit} names={page.names} acts={page.acts} />
               ))}
             </ul>
             <PageNumbers

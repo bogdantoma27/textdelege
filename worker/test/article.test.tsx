@@ -188,14 +188,14 @@ describe("article route", () => {
   it("offers the comparison with the current form on superseded versions only", () => {
     const old = view(one, "2012-01-01");
     expect(old).toContain('href="/codul-civil/art-1/compara/2011-10-01..2023-07-09"');
-    expect(old).toContain("Compară cu forma actuală");
+    expect(old).toContain('aria-label="Compară cu forma actuală">Cu forma actuală</a>');
     expect(old).not.toContain("Compară două versiuni");
-    expect(view(one)).not.toContain("Compară cu forma actuală");
+    expect(view(one)).not.toContain("Cu forma actuală");
     const three = structuredClone(one);
     three.versions.push({ ...structuredClone(one.versions[1]!), from: "2025-01-01", until: null });
     three.versions[1]!.until = "2024-12-31";
     const middle = view(three, "2024-01-01");
-    expect(middle).toContain('<a href="/codul-civil/art-1/compara/2023-07-09..2025-01-01">Compară cu forma actuală</a>');
+    expect(middle).toContain('<a href="/codul-civil/art-1/compara/2023-07-09..2025-01-01" aria-label="Compară cu forma actuală">Cu forma actuală</a>');
     expect(middle).toContain("compara/2011-10-01..2023-07-09");
   });
 
@@ -311,7 +311,7 @@ describe("renderArticle", () => {
     expect(form).toContain('<input type="hidden" name="cuprins" value="titl"');
     expect(form).toMatch(/<input id="optiune-atribuire" type="checkbox" name="atribuire" value="1" checked=""/);
     expect(form).toMatch(/<input id="optiune-ultima" type="checkbox" name="ultima" value="1" checked=""/);
-    expect(form).toContain('<label for="optiune-atribuire">Legea fiecărui alineat</label>');
+    expect(form).toContain('<label for="optiune-atribuire">Surse pe alineat</label>');
     expect(form).toContain('<legend class="vh">Opțiuni de afișare</legend>');
     const tools = html.slice(html.indexOf('<div class="tools">'), html.indexOf('<div class="law"'));
     expect(tools).toContain('<p class="compare-links">');
@@ -335,11 +335,11 @@ describe("renderArticle", () => {
     expect(primaries(html)).toBe(1);
     expect(primaries(html.slice(0, html.indexOf('<aside class="rail">')))).toBe(0);
     expect(html).toContain('href="/codul-civil/art-1/compara/2011-10-01..2023-07-09"');
-    expect(html).toContain("Compară două versiuni");
+    expect(html).toContain('aria-label="Compară două versiuni">Compară</a>');
     expect(html).toContain('aria-label="Versiunile textului"');
     expect(html).toContain("01.10.2011");
     const single = view(two);
-    expect(single).toContain('<p class="compare-links"><span class="off" aria-disabled="true">Compară două versiuni</span></p>');
+    expect(single).toContain('<p class="compare-links"><span class="off" aria-disabled="true">Compară</span></p>');
     expect(single).not.toContain("/compara/");
     expect(html).toContain('<section class="time"');
     expect(html).toContain("<h2>Versiuni</h2>");
@@ -549,13 +549,13 @@ describe("renderArticle", () => {
       changed.freshness = { ...changed.freshness!, ...freshness };
       return view(one, null, {}, changed);
     };
-    expect(withStatus({ status: "stale" })).toContain("a fost la 01.11.2026, mai veche decât ar trebui");
+    expect(withStatus({ status: "stale" })).toContain("Textul poate să nu fie la zi.");
+    expect(withStatus({ status: "stale" })).toContain("a fost la 01.11.2026.");
     const railOf = (html: string) => html.slice(html.indexOf('<aside class="rail">'));
     const stale = railOf(withStatus({ status: "stale" }));
-    const note = /<h2>Actualitate<\/h2><p>[\s\S]*?<\/p>/.exec(stale)?.[0] ?? "";
+    const note = /<h2>Actualitate<\/h2><div class="warning">[\s\S]*?<\/div>/.exec(stale)?.[0] ?? "";
     expect(note).toContain(portal);
     expect(note.replaceAll(portal, "")).not.toContain("legislatie.just.ro");
-    expect(stale).not.toContain('class="warning"');
     const missing = railOf(withStatus({ status: "pending-change", newest_change: "legea-54-2023", change_in_repo: false }));
     expect(missing).toContain('<div class="warning">');
     expect(missing).toContain("nu este încă preluată în Codul civil: Legea nr. 54/2023.");
@@ -825,7 +825,7 @@ describe("article page: citation, freshness, paragraph copy, issue link", () => 
     expect(html).not.toMatch(/data-copy="Art\. 1 alin\./);
   });
 
-  it("shows the warning box above the text only when a known amendment is missing from it", () => {
+  it("shows the warning box above the text when a known amendment is missing from it or the verification is stale", () => {
     const missing = (change_in_repo: boolean, date?: string) => {
       const changed = structuredClone(act);
       changed.freshness = {
@@ -844,23 +844,27 @@ describe("article page: citation, freshness, paragraph copy, issue link", () => 
     expect(above(html)).toContain("nu este încă preluată");
     expect(above(missing(false, "2027-01-01"))).toContain('class="warning fresh-note"');
     expect(above(missing(true, "2027-01-01"))).not.toContain("fresh-note");
-    for (const status of ["stale", "unverified", "source-unavailable"] as const) {
+    const stale = withStatus("stale");
+    expect(above(stale)).toContain('class="warning fresh-note"');
+    expect(stale).toContain('<b>Textul poate să nu fie la zi.</b>');
+    for (const status of ["unverified", "source-unavailable"] as const) {
       expect(above(withStatus(status))).not.toContain("fresh-note");
       expect(withStatus(status)).not.toContain("fresh-note");
     }
     expect(above(withStatus("current"))).not.toContain("fresh-note");
   });
 
-  it("puts a calm line after the text, without a box, when the act is stale, unverified or unavailable", () => {
-    const html = withStatus("stale");
+  it("puts a calm line after the text, without a box, when the act is unverified or unavailable, and none when stale", () => {
+    const html = withStatus("unverified");
     const src = /<div class="src">[^]*?<\/div>/.exec(html)?.[0] ?? "";
     expect(html.indexOf('<div class="law"')).toBeLessThan(html.indexOf('<div class="src">'));
     expect(src).toContain('<p class="fresh-line">');
-    expect(src).toContain("mai veche decât ar trebui");
+    expect(src).toContain("nu a fost încă verificat");
     expect(src).toContain(`<a href="${act.portal}">legislatie.just.ro</a>`);
     expect(src).not.toContain("warning");
-    expect(withStatus("stale", "2012-01-01")).toContain("mai veche decât ar trebui");
-    expect(withStatus("unverified")).toContain('<p class="fresh-line">');
+    expect(withStatus("source-unavailable")).toContain('<p class="fresh-line">');
+    expect(withStatus("stale")).not.toContain("fresh-line");
+    expect(withStatus("stale", "2012-01-01")).toContain("Textul poate să nu fie la zi.");
     expect(withStatus("current")).not.toContain("fresh-line");
   });
 

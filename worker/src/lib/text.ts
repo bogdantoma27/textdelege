@@ -95,3 +95,25 @@ export function unitText(id: string): string {
   if (unit.line) parts.push(t("unitLine", { n: unit.line }));
   return parts.join(" ");
 }
+
+const STOP_WORDS = new Set(
+  "de la in si a al ale cu pe din se sau ca ce un o pentru prin fi este nu".split(" "),
+);
+
+const fold = (word: string) =>
+  word
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+
+/**
+ * Takes the <mark> off Romanian stop-words in a safe-HTML snippet, so that a query like "contract de munca" lights
+ * up "contract" and "munca" but not every "de". A query made only of stop-words keeps all its marks.
+ */
+export function unmarkStopWords(html: string, query: string): string {
+  const words = query.split(/[^\p{L}\p{N}]+/u).filter((word) => word !== "");
+  if (words.every((word) => STOP_WORDS.has(fold(word)))) return html;
+  return html.replace(/<mark>(.*?)<\/mark>/g, (whole, inner: string) =>
+    STOP_WORDS.has(fold(inner)) ? inner : whole,
+  );
+}

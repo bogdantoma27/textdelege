@@ -27,6 +27,18 @@ async function amendingActUrl(store: Store, citation: Citation): Promise<string 
   return lawUrlFromKey(key);
 }
 
+// Building a map of the whole act index costs real CPU; do it once per loaded index, not per request.
+const byPath = new WeakMap<ActIndexEntry[], Map<string, ActIndexEntry>>();
+
+function actsByPath(index: ActIndexEntry[]): Map<string, ActIndexEntry> {
+  let acts = byPath.get(index);
+  if (acts === undefined) {
+    acts = new Map(index.map((entry) => [entry.path, entry]));
+    byPath.set(index, acts);
+  }
+  return acts;
+}
+
 export const LIVE_LIMIT = 8;
 
 export const searchRoutes = new Hono<AppEnv>();
@@ -37,8 +49,9 @@ searchRoutes.get("/cauta", async (c) => {
   const store = c.get("store");
   const index = await store.actIndex();
   const names = actNames(index);
+  const acts = actsByPath(index);
 
-  if (query === "") return c.html(renderSearch({ query, inForce, hits: null, total: 0, over: false, live: false, page: 1, pages: 1, names }));
+  if (query === "") return c.html(renderSearch({ query, inForce, hits: null, total: 0, over: false, live: false, page: 1, pages: 1, names, acts }));
 
   const citation = parseCitation(query);
   const target = citation === null ? null : selectedUrl(index, citation);
@@ -48,7 +61,7 @@ searchRoutes.get("/cauta", async (c) => {
 
   if (c.req.query("live") === "1") {
     const hits = await store.search(query, inForce, LIVE_LIMIT);
-    return c.html(renderSearch({ query, inForce, hits, total: hits.length, over: false, live: true, page: 1, pages: 1, names }));
+    return c.html(renderSearch({ query, inForce, hits, total: hits.length, over: false, live: true, page: 1, pages: 1, names, acts }));
   }
 
   const counted = await store.searchCount(query, inForce);
@@ -57,5 +70,5 @@ searchRoutes.get("/cauta", async (c) => {
   const pages = Math.max(1, Math.ceil(total / HITS_LIMIT));
   const page = Math.min(pageNumber(c.req.query("pagina") ?? null), pages);
   const hits = total === 0 ? [] : await store.search(query, inForce, HITS_LIMIT, (page - 1) * HITS_LIMIT);
-  return c.html(renderSearch({ query, inForce, hits, total, over, live: false, page, pages, names }));
+  return c.html(renderSearch({ query, inForce, hits, total, over, live: false, page, pages, names, acts }));
 });

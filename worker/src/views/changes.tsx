@@ -7,6 +7,7 @@ import { formatRo } from "../lib/dates";
 import { unitText } from "../lib/text";
 import type { ChangeItem } from "../lib/types";
 import { actUrl, articleUrl } from "../lib/urls";
+import { MoreFilters } from "./acts";
 import { Breadcrumbs, DataTable, DateField, DateHint, ErrorSummary, FieldError } from "./components";
 import { Indexed } from "./indexed";
 import { Layout, ORIGIN } from "./layout";
@@ -118,7 +119,7 @@ function FilterForm({ page }: { page: ChangesPage }) {
   const { filters } = page;
   return (
     <form class="filters" method="get" action={page.path} novalidate data-filter="">
-      <div class="form-group">
+      <div class="form-group filter-top">
         <label class="label" for="filter-q">
           {t("changesFilterSearch")}
         </label>
@@ -132,6 +133,16 @@ function FilterForm({ page }: { page: ChangesPage }) {
           autocomplete="off"
         />
       </div>
+      <MoreFilters
+        open={
+          filters.act !== null ||
+          filters.verb !== null ||
+          filters.from !== null ||
+          filters.to !== null ||
+          page.alt !== "" ||
+          Object.keys(page.invalid).length > 0
+        }
+      >
       {page.choices !== null && (
         <div class="form-group">
           <label class="label" for="filter-act">
@@ -225,6 +236,7 @@ function FilterForm({ page }: { page: ChangesPage }) {
         </button>
         {filterQuery(filters) !== "" && <a href={page.path}>{t("changesFilterClear")}</a>}
       </div>
+      </MoreFilters>
     </form>
   );
 }

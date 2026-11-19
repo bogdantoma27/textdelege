@@ -209,6 +209,7 @@ export function renderLaw(whole: LawObject, names: ActNames, requested: number) 
   return (
     <Layout
       title={law.label}
+      description={law.title !== "" ? law.title : law.label}
       script="/article.js"
       canonical={paged.page > 1 ? `${permanent}?pagina=${paged.page}` : permanent}
       rail={

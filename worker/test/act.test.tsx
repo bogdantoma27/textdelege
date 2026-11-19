@@ -159,7 +159,7 @@ const TABS: [string, ActTab, string][] = [
   ["/codul-civil/istoric", "istoric", "Istoric"],
   ["/codul-civil/jurisprudenta", "jurisprudenta", "Jurisprudență"],
   ["/codul-civil/statistici", "statistici", "Statistici"],
-  ["/codul-civil/date", "date", "Date"],
+  ["/codul-civil/date", "date", "Detalii"],
 ];
 
 describe("act header", () => {
@@ -254,7 +254,7 @@ describe("act header", () => {
       expect(html).toContain(
         'Copiază citarea</button><span class="copied" role="status"></span><button class="btn secondary" type="button" data-copy="https://textdelege.ro/codul-civil/2023-07-09" data-copied="Copiat" data-failed="Nu s-a putut copia. Selectează adresa și copiaz-o.">Copiază linkul</button><span class="copied" role="status"></span></p>',
       );
-      expect(html.match(/class="btn"/g)).toHaveLength(2);
+      expect(html.match(/class="btn"/g)).toHaveLength(path === "/codul-civil" ? 2 : 1);
       expect(html).toContain(
         '<span class="addr"><span class="vh">Adresa permanentă: </span>textdelege.ro/codul-civil/2023-07-09</span>',
       );
@@ -370,8 +370,8 @@ describe("contents", () => {
     const options = (html: string) => [...html.matchAll(/<option value="([^"]*)"( selected="")?>([^<]*)<\/option>/g)].map((m) => [m[1], m[2] !== undefined, m[3]]);
     expect(options(view("text", {}, changing))).toEqual([
       ["", true, "Azi, textul în vigoare"],
-      ["2099-01-01", false, "01.01.2099 · act nemenționat de sursă (viitor)"],
-      ["2018-03-01", false, "01.03.2018 · OUG nr. 1/2018 și încă 1"],
+      ["2099-01-01", false, "01.01.2099 (viitor)"],
+      ["2018-03-01", false, "01.03.2018 · OUG nr. 1/2018"],
       ["2011-10-01", false, "01.10.2011 · Legea nr. 71/2011"],
     ]);
     expect(view("text", {}, changing)).not.toContain('type="date"');
@@ -399,19 +399,24 @@ describe("contents", () => {
     }
   });
 
-  it("shows a muted line under the status row when the act may be out of date, and a box only for a missing amendment", () => {
+  it("shows a warning box under the status row when the text may be out of date or an amendment is missing, and a muted line when unverified", () => {
     const stale = structuredClone(codul);
     stale.freshness = { ...stale.freshness!, status: "stale" };
     const html = view("text", {}, stale);
     expect(html).toMatch(
-      /<h1>Codul civil<\/h1><div class="status">[^]*?<\/div><p class="fresh-line">[^]*?mai veche decât ar trebui[^]*?<\/p><section class="time compact"/,
+      /<h1>Codul civil<\/h1><div class="status">[^]*?<\/div><div class="warning fresh-note"><svg class="warning-icon"[^]*?<\/svg><div class="warning-text"><span class="vh">[^<]*<\/span><b>Textul poate să nu fie la zi\.<\/b>[^]*?a fost la[^]*?<\/div><\/div><section class="time compact"/,
     );
-    expect(html).not.toContain("fresh-note");
-    expect(view("text", { date: "2012-01-01" }, stale)).toContain('<p class="fresh-line">');
+    expect(html).not.toContain("fresh-line");
+    expect(view("text", { date: "2012-01-01" }, stale)).toContain('class="warning fresh-note"');
+    const unverified = structuredClone(codul);
+    unverified.freshness = { ...unverified.freshness!, status: "unverified" };
+    const calm = view("text", {}, unverified);
+    expect(calm).toContain('<p class="fresh-line">');
+    expect(calm).not.toContain("fresh-note");
     const missing = structuredClone(codul);
     missing.freshness = { ...missing.freshness!, status: "pending-change", newest_change: missing.laws[0]!.key, change_in_repo: false };
     const boxed = view("text", {}, missing);
-    expect(boxed).toMatch(/<\/div><div class="warning fresh-note"><strong class="warning-text">[^]*?<\/strong><\/div><section class="time compact"/);
+    expect(boxed).toMatch(/<\/div><div class="warning fresh-note"><svg class="warning-icon"[^]*?<\/svg><div class="warning-text">[^]*?<\/div><\/div><section class="time compact"/);
     expect(boxed).not.toContain("fresh-line");
   });
 
@@ -621,22 +626,49 @@ describe("dated act page", () => {
 describe("istoric tab", () => {
   it("istoric tab lists events with applied or pending state", async () => {
     const html = await page(`/${BIG}/istoric`);
-    const rows = html.match(/<tr>.*?<\/tr>/gs)!.slice(1);
+    const rows = html.match(/<li>.*?<\/li>/gs)!.filter((row) => row.includes("hist-date"));
     expect(rows).toHaveLength(3);
     expect(html).toContain('<link rel="canonical" href="https://textdelege.ro/lege/2099/1/istoric"');
+    expect(html.match(/<h3>(\d{4})<\/h3>/g)).toEqual(["<h3>2099</h3>", "<h3>2020</h3>", "<h3>2015</h3>"]);
     expect(rows[0]).toContain("01.01.2099");
     expect(rows[0]).toContain('<strong class="badge badge-yellow">Programat</strong>');
     expect(rows[0]).toContain("Programat");
     expect(rows[0]).toContain('<a href="/lege/2023/200">Legea nr. 200/2023</a>');
     expect(rows[0]).toContain(`href="/${BIG}/compara/2098-12-31..2099-01-01"`);
     expect(rows[1]).toContain("01.01.2020");
-    expect(rows[1]).toContain("Aplicat");
     expect(rows[1]).not.toContain("Programat");
     expect(rows[1]).toContain(`href="/${BIG}/compara/2019-12-31..2020-01-01"`);
-    expect(rows[1]).toContain(">4<");
+    expect(rows[1]).toContain("4 articole modificate");
     expect(rows[2]).toContain("01.01.2015");
     expect(rows[2]).toContain('<a href="/lege/2011/71">Legea nr. 71/2011</a>');
     expect(rows[2]).toContain(`href="/${BIG}/2015-01-01"`);
+  });
+
+  it("says once that the source does not name some amending acts, and repeats nothing per row", () => {
+    const act = structuredClone(codul);
+    act.timeline = [
+      { date: "2023-07-09", laws: [{ key: "legea-200-2023", label: "Legea nr. 200/2023" }], articles: 2 },
+      { date: "2018-03-01", laws: [{ key: "", label: "Lexifina" }], articles: 1 },
+      { date: "2015-03-01", laws: [], articles: 3 },
+    ];
+    const html = view("istoric", {}, act);
+    expect(html.match(/Sursa nu numește actele/g)).toHaveLength(1);
+    expect(html).not.toContain("act nemenționat de sursă");
+    expect(html).not.toContain("Lexifina");
+    expect(html).toContain("1 articol modificat");
+    expect(html).toContain('<a href="/lege/2023/200">Legea nr. 200/2023</a>');
+    const named = structuredClone(codul);
+    named.timeline = [{ date: "2023-07-09", laws: [{ key: "legea-200-2023", label: "Legea nr. 200/2023" }], articles: 2 }];
+    expect(view("istoric", {}, named)).not.toContain("Sursa nu numește actele");
+  });
+
+  it("shows the date selector only on the text tab", () => {
+    expect(view("text")).toContain('class="date-form');
+    for (const tab of ["istoric", "jurisprudenta", "statistici", "date"] as const) {
+      const html = view(tab);
+      expect(html, tab).not.toContain("date-form");
+      expect(html, tab).not.toContain("Textul la data de");
+    }
   });
 
   it("paginates at 100 rows", () => {
@@ -647,12 +679,12 @@ describe("istoric tab", () => {
       articles: 1,
     }));
     const first = view("istoric", { page: null }, act);
-    expect(first.match(/<tr>/g)).toHaveLength(101);
+    expect(first.match(/class="hist-date"/g)).toHaveLength(100);
     expect(first).toContain(`href="/${BIG}/istoric?pagina=2"`);
     expect(first).toMatch(/<span class="off" aria-disabled="true"><span class="pagination-title"><svg [^>]*>[^]*?<\/svg>Pagina anterioară<\/span><\/span>/);
     expect(first).not.toContain('rel="prev"');
     const second = view("istoric", { page: 2 }, act);
-    expect(second.match(/<tr>/g)).toHaveLength(31);
+    expect(second.match(/class="hist-date"/g)).toHaveLength(30);
     expect(second).toContain(
       '<link rel="canonical" href="https://textdelege.ro/lege/2099/1/istoric?pagina=2"',
     );
@@ -704,6 +736,7 @@ describe("statistici tab", () => {
     expect(html).toContain("Modificări pe ani");
     const rows = html.match(/<tr>.*?<\/tr>/gs)!.slice(1);
     expect(rows).toHaveLength(3);
+    expect(html).not.toContain("data stack");
     expect(rows[0]).toContain("2015");
     expect(rows[0]).toContain("<b>8</b>");
     expect(rows[0]).toContain('class="bar" style="width:100%" aria-hidden="true"');

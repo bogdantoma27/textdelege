@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import app from "../src/index";
-import { listFromIndex } from "../src/lib/act-list";
+import { actSubject, listFromIndex } from "../src/lib/act-list";
 import { normalise } from "../src/lib/citation";
 import { type ActFilter, createStore } from "../src/lib/store";
 import type { ActIndexEntry } from "../src/lib/types";
@@ -277,6 +277,62 @@ describe("the acts page", () => {
     const html = await page("/acte?q=zzzzzz");
     expect(html).toContain("Niciun act nu corespunde filtrelor.");
     expect(html).not.toContain("page-numbers");
+  });
+});
+
+describe("act subjects", () => {
+  it("strips the designation, or unwraps the parenthesis, or says nothing", () => {
+    expect(
+      actSubject("Hotărârea Guvernului nr. 951/2026 pentru completarea Hotărârii Guvernului nr. 1.074/2021 privind x", "HG nr. 951/2026"),
+    ).toBe("pentru completarea Hotărârii Guvernului nr. 1.074/2021 privind x");
+    expect(actSubject("Decizia nr. 965/2026 privind autorizarea de funcționare a societății FLEX", "Decizia ASF nr. 965/2026")).toBe(
+      "privind autorizarea de funcționare a societății FLEX",
+    );
+    expect(actSubject("Codul muncii (Legea nr. 53/2003)", "Codul muncii")).toBe("Legea nr. 53/2003");
+    expect(actSubject("Legea nr. 31/1990", null)).toBeNull();
+    expect(actSubject("Codul civil", "Codul civil")).toBeNull();
+    expect(actSubject("Constituția României", null)).toBeNull();
+    expect(actSubject("Constituția României", "Constituția")).toBe("Constituția României");
+  });
+});
+
+describe("act rows and kind chips", () => {
+  const entry = (path: string, kind: string, title: string, short: string | null): ActIndexEntry => ({
+    path, alias: null, title, short, kind, status: "in force", from: null, latest: "", articles: 1,
+  });
+
+  it("shows the subject under the link and does not repeat the number", async () => {
+    const acts = [
+      entry("hg/2026/951", "hg", "Hotărârea Guvernului nr. 951/2026 pentru completarea Hotărârii Guvernului nr. 1.074/2021", "HG nr. 951/2026"),
+      entry("lege/2003/53", "lege", "Codul muncii (Legea nr. 53/2003)", "Codul muncii"),
+      entry("oug/2002/7", "oug", "Ordonanța de urgență nr. 7/2002", null),
+      entry("lege/2001/5", "lege", "Legea privind altceva", "Altceva"),
+    ];
+    const restore = await replaceObject("acts/index.json", { schema: "textdelege/act-index/1", acts });
+    try {
+      const html = await page("/acte");
+      expect(html).toContain('<p class="doc-subject">pentru completarea Hotărârii Guvernului nr. 1.074/2021</p>');
+      expect(html).toContain('<p class="doc-subject">Legea nr. 53/2003</p>');
+      expect(html).not.toContain("nr. 951/2026</span>");
+      expect(html).not.toContain("nr. 53/2003</span>");
+      expect(html).not.toContain("nr. 7/2002</span>");
+      expect(html).toContain("<span>nr. 5/2001</span>");
+      expect(html.match(/class="doc-subject"/g)).toHaveLength(3);
+    } finally {
+      await restore();
+    }
+  });
+
+  it("links the kind chips with the other filters and marks the current kind", async () => {
+    const html = await page("/acte?tip=lege&an=1990&q=muncii");
+    expect(html).toContain('<nav class="kind-nav" aria-label="Tipuri de acte">');
+    expect(html).toContain('<a class="kind-link" href="/acte?an=1990&amp;q=muncii">Toate</a>');
+    expect(html).toContain('<a class="kind-link" href="/acte?tip=oug&amp;an=1990&amp;q=muncii">');
+    expect(html).toMatch(/<a class="kind-link" href="\/acte\?tip=lege&amp;an=1990&amp;q=muncii" aria-current="true">Legi<\/a>/);
+    expect(html.match(/aria-current="true"/g)).toHaveLength(1);
+    expect(html).toMatch(/<details class="more-filters" open/);
+    expect(await page("/acte")).toMatch(/<details class="more-filters">/);
+    expect(await page("/acte")).toContain('<a class="kind-link" href="/acte" aria-current="true">Toate</a>');
   });
 });
 

@@ -242,6 +242,7 @@ describe("Layout", () => {
       "/#coduri",
       "/acte",
       "/modificari",
+      "/ce-s-a-schimbat",
       "/legislatie",
       "/cauta",
       "/abonare",

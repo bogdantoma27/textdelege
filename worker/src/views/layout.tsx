@@ -3,6 +3,7 @@ import type { Child } from "hono/jsx";
 import { t } from "../text";
 import { formatRo } from "../lib/dates";
 import { builtDay } from "../lib/outages";
+import { serializeJsonLd } from "../lib/seo";
 import { SITE_REPOSITORY, SOURCE_REPOSITORY, SUPPORT_URL } from "../lib/urls";
 import { ArrowDownIcon, ArrowUpIcon, ExternalIcon, Logo, SearchIcon } from "./icons";
 
@@ -11,6 +12,8 @@ export type LayoutProps = {
   description?: string;
   canonical: string;
   noindex?: boolean;
+  ogType?: "article" | "website";
+  jsonLd?: object;
   alternates?: { href: string; type: string; title: string }[];
   query?: string;
   script?: string;
@@ -222,6 +225,7 @@ function Footer({ compact }: { compact?: boolean }) {
               { label: t("navCodes"), href: "/#coduri" },
               { label: t("navActs"), href: "/acte" },
               { label: t("navChanges"), href: "/modificari" },
+              { label: t("footerDomainChanges"), href: "/ce-s-a-schimbat" },
               { label: t("footerPointInTime"), href: "/legislatie" },
               { label: t("footerSearch"), href: "/cauta" },
             ]}
@@ -270,6 +274,20 @@ export function Layout(props: LayoutProps) {
           {props.description && <meta name="description" content={props.description} />}
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
           <link rel="canonical" href={canonical} />
+          <meta property="og:site_name" content={t("siteName")} />
+          <meta property="og:locale" content="ro_RO" />
+          <meta property="og:type" content={props.ogType ?? "website"} />
+          <meta property="og:title" content={props.title} />
+          {props.description && <meta property="og:description" content={props.description} />}
+          <meta property="og:url" content={canonical} />
+          <meta property="og:image" content={`${ORIGIN}/og.png`} />
+          <meta property="og:image:width" content="1200" />
+          <meta property="og:image:height" content="630" />
+          <meta property="og:image:alt" content={t("seoImageAlt")} />
+          <meta name="twitter:card" content="summary_large_image" />
+          {props.jsonLd !== undefined && (
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(props.jsonLd) }} />
+          )}
           {props.noindex && <meta name="robots" content="noindex" />}
           {props.alternates?.map((alternate) => (
             <link rel="alternate" type={alternate.type} href={alternate.href} title={alternate.title} />

@@ -31,6 +31,7 @@ import {
 import { Indexed } from "./indexed";
 import { CopyIcon } from "./icons";
 import { Layout, ORIGIN } from "./layout";
+import { articleDescription, articleJsonLd } from "./seo";
 import { LawLink, StatusBadge, VERBS, lawLabelText, lawLabels } from "./shared";
 
 export interface ArticleContext {
@@ -257,7 +258,13 @@ export function renderArticle(
   const where = entry === undefined ? [] : headingPath(act, entry);
   const heading = articleLabel(article, act.articles);
   const title = `${heading} ${name}`;
-  const description = article.title ? `${title}: ${article.title}` : title;
+  const description = articleDescription(
+    act,
+    article,
+    version,
+    article.repealed !== null && version.until === null && article.repealed.on <= version.from ? article.repealed.on : null,
+    showsText,
+  );
   const canonical = `${ORIGIN}${path}`;
 
   return (
@@ -265,6 +272,8 @@ export function renderArticle(
       title={title}
       description={description}
       canonical={canonical}
+      ogType="article"
+      jsonLd={articleJsonLd(act, actRef, article, version, canonical)}
       script="/article.js"
       toc={<Contents {...rail} path={path} current={article.file} prev={article.prev} next={article.next} />}
       rail={<Rail {...rail} />}
@@ -299,12 +308,19 @@ export function renderArticle(
         <div class="tools">
           <p class="compare-links">
             {article.versions.length > 1 ? (
-              <a href={compare}>{t(toCurrent === compare ? "compareWithCurrent" : "compareVersions")}</a>
+              <a
+                href={compare}
+                aria-label={t(toCurrent === compare ? "compareWithCurrent" : "compareVersions")}
+              >
+                {t(toCurrent === compare ? "compareCurrentShort" : "compareShort")}
+              </a>
             ) : (
-              <OffLink>{t("compareVersions")}</OffLink>
+              <OffLink>{t("compareShort")}</OffLink>
             )}
             {toCurrent !== undefined && toCurrent !== compare && (
-              <a href={toCurrent}>{t("compareWithCurrent")}</a>
+              <a href={toCurrent} aria-label={t("compareWithCurrent")}>
+                {t("compareCurrentShort")}
+              </a>
             )}
           </p>
           {options.length > 0 && (

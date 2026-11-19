@@ -12,7 +12,7 @@ import { Indexed } from "./indexed";
 import { ORIGIN } from "./layout";
 import { Panel, Support, WarningText } from "./components";
 import { outcomeText } from "./shared";
-import { ChevronLeftIcon, ChevronRightIcon } from "./icons";
+import { ChevronLeftIcon, ChevronRightIcon, WarningIcon } from "./icons";
 
 const WINDOW = 30;
 const FILTER_CAP = 100;
@@ -269,6 +269,7 @@ function freshnessOf(act: ActObject): { level: FreshnessLevel; text: string } {
       break;
     }
     case "stale":
+      if (verified) level = "warn";
       text = verified ? t("freshStale", { act: of, date: verified }) : unverified;
       break;
     case "unverified":
@@ -297,7 +298,20 @@ export function Freshness({ act }: { act: ActObject }) {
 
 export function FreshnessWarning({ act }: { act: ActObject }) {
   const { level, text } = freshnessOf(act);
-  return level === "warn" ? <WarningText class="fresh-note">{withPortalLink(text, act)}</WarningText> : null;
+  if (level !== "warn") return null;
+  const cut = text.indexOf(". ");
+  const first = cut < 0 ? text : text.slice(0, cut + 1);
+  const rest = cut < 0 ? "" : text.slice(cut + 1);
+  return (
+    <div class="warning fresh-note">
+      <WarningIcon />
+      <div class="warning-text">
+        <span class="vh">{t("warningLabel")}: </span>
+        <b>{withPortalLink(first, act)}</b>
+        {withPortalLink(rest, act)}
+      </div>
+    </div>
+  );
 }
 
 export function freshnessIsOk(act: ActObject): boolean {

@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it } from "vitest";
 import app from "../src/index";
+import { designation, renderSearch } from "../src/views/search";
 import { removeObject } from "./support";
 
 const get = (path: string, init?: RequestInit) =>
@@ -274,3 +275,38 @@ describe("search", () => {
     expect(html).toContain("<li>");
   });
 });
+
+describe("search result act line", () => {
+  const hit = { actPath: "lege/2003/53", file: "art-0001", number: "1", title: null, state: "in-force" as const, snippet: "x" };
+  const render = (status: string, short: string | null) => {
+    const entry = { path: "lege/2003/53", alias: null, title: "Codul muncii (Legea nr. 53/2003)", short, kind: "lege", status, from: null, latest: "", articles: 1 };
+    return String(
+      renderSearch({
+        query: "x", inForce: false, hits: [hit], total: 1, over: false, live: false, page: 1, pages: 1,
+        names: new Map([[hit.actPath, { ref: hit.actPath, name: short ?? entry.title }]]),
+        acts: new Map([[hit.actPath, entry]]),
+      }),
+    );
+  };
+
+  it("takes the designation from the title parenthesis only for short-named acts", () => {
+    expect(designation({ short: "Codul muncii", title: "Codul muncii (Legea nr. 53/2003)" })).toBe("Legea nr. 53/2003");
+    expect(designation({ short: null, title: "Codul muncii (Legea nr. 53/2003)" })).toBeNull();
+    expect(designation({ short: "Codul civil", title: "Legea nr. 287/2009" })).toBeNull();
+  });
+
+  it("says the designation and that the act is in force", () => {
+    expect(render("in force", "Codul muncii")).toContain(
+      '<p class="hit-act">Legea nr. 53/2003 · <span class="st st-in">în vigoare</span></p>',
+    );
+  });
+
+  it("says abrogat for a repealed act and omits the designation without a short name", () => {
+    expect(render("repealed", null)).toContain('<p class="hit-act"><span class="st st-out">abrogat</span></p>');
+  });
+
+  it("uses the badge label for other statuses", () => {
+    expect(render("amending act", null)).toContain('<p class="hit-act"><span>Act de modificare</span></p>');
+  });
+});
+

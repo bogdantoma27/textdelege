@@ -311,14 +311,27 @@ function openExternalLinksApart() {
   }
 }
 
+/* article-page */
+let lastScrollY = 0;
+let scrollingUp = false;
+
 function updateScrollLinks() {
   const up = document.querySelector(".to-top");
   const down = document.querySelector(".to-bottom");
   if (!up || !down) return;
   const pastTop = scrollY > 400;
+  const left = document.documentElement.scrollHeight - scrollY - innerHeight;
+  if (matchMedia("(max-width:640px)").matches) {
+    if (Math.abs(scrollY - lastScrollY) >= 4) scrollingUp = scrollY < lastScrollY;
+    lastScrollY = scrollY;
+    up.classList.toggle("show", pastTop && scrollingUp && left > 200);
+    down.classList.remove("show");
+    return;
+  }
   up.classList.toggle("show", pastTop);
-  down.classList.toggle("show", !pastTop && document.documentElement.scrollHeight - scrollY - innerHeight > 400);
+  down.classList.toggle("show", !pastTop && left > 400);
 }
+/* end article-page */
 
 const messages = new WeakMap();
 
@@ -361,6 +374,20 @@ function initFilterForms() {
     update();
   }
 }
+
+// The fields behind the "Filtre" button show always on wide screens, where the button is hidden.
+const WIDE = matchMedia("(min-width: 641px)");
+
+function initMoreFilters() {
+  for (const details of document.querySelectorAll("details.more-filters:not([data-ready])")) {
+    details.dataset.ready = "";
+    if (WIDE.matches) details.open = true;
+  }
+}
+
+WIDE.addEventListener("change", (event) => {
+  if (event.matches) for (const details of document.querySelectorAll("details.more-filters")) details.open = true;
+});
 
 function initTimelineWheel() {
   document.addEventListener(
@@ -490,6 +517,7 @@ new MutationObserver(() => {
   centreTimelines();
   initTabStrips();
   initFilterForms();
+  initMoreFilters();
 }).observe(document.body, { childList: true });
 
 initPanelTabs();
@@ -501,6 +529,7 @@ openExternalLinksApart();
 initScrollLinks();
 initTimelineWheel();
 initFilterForms();
+initMoreFilters();
 initCopyButtons();
 centreTimelines();
 initPhoneMenu();

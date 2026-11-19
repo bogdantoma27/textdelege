@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from "hono";
+import { unmarkStopWords } from "./text";
 import type {
   ActIndex,
   ActIndexEntry,
@@ -262,7 +263,7 @@ export function createStore(env: Env): Store {
         number: row.number,
         title: row.title,
         state: row.state,
-        snippet: toSafeHtml(row.snippet),
+        snippet: unmarkStopWords(toSafeHtml(row.snippet), q),
       }));
     },
 

@@ -136,7 +136,7 @@ export function renderPointInTime(
   const dated = date === now ? undefined : date;
   const day = formatRo(date);
   return (
-    <Layout title={heading} canonical={`${ORIGIN}/legislatie/${date}`}>
+    <Layout title={heading} description={t("pitIntro")} canonical={`${ORIGIN}/legislatie/${date}`}>
       <section class="solo">
         <Breadcrumbs
           items={[{ href: "/", label: t("breadcrumbHome") }]}

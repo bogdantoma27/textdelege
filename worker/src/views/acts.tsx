@@ -1,5 +1,7 @@
+import type { Child } from "hono/jsx";
 import { t, tPlural } from "../text";
 import type { ActList, ActListItem } from "../lib/store";
+import { actSubject } from "../lib/act-list";
 import { parseActStatus } from "../lib/status";
 import { actUrl } from "../lib/urls";
 import { Breadcrumbs, ErrorSummary, FieldError, PageNumbers } from "./components";
@@ -47,17 +49,21 @@ const ARTICLES = {
 } as const;
 
 function Row({ act }: { act: ActListItem }) {
+  const name = act.short ?? act.title;
+  const subject = actSubject(act.title, act.short);
   const identifier =
     act.number !== null && act.year !== null ? t("actIdentifier", { number: act.number, year: act.year }) : "";
+  const repeated = identifier !== "" && (name.includes(identifier) || (subject?.includes(identifier) ?? false));
   return (
     <li>
       <div class="doc-main">
         <a class="doc-link" href={actUrl(act.alias ?? act.path)}>
-          {act.short ?? act.title}
+          {name}
         </a>
+        {subject !== null && <p class="doc-subject">{subject}</p>}
         <p class="doc-meta">
           <StatusCell status={act.status} />
-          {identifier !== "" && <span>{identifier}</span>}
+          {identifier !== "" && !repeated && <span>{identifier}</span>}
           {act.articles !== null && <span>{tPlural(act.articles, ARTICLES, { n: grouped(act.articles) })}</span>}
         </p>
       </div>
@@ -65,9 +71,56 @@ function Row({ act }: { act: ActListItem }) {
   );
 }
 
+/**
+ * The fields behind the "Filtre" button. Closed on a phone unless one of them is in use; site.js opens it on
+ * wide screens, where the button is hidden. Without JavaScript the button stays and works as a plain disclosure.
+ */
+export function MoreFilters({ open, children }: { open: boolean; children: Child }) {
+  return (
+    <details class="more-filters" open={open}>
+      <summary class="btn secondary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M4 7h16M7 12h10M10 17h4" />
+        </svg>
+        {t("filtersToggle")}
+      </summary>
+      <div class="more-fields">{children}</div>
+    </details>
+  );
+}
+
+function KindChips({ query }: { query: ActsQuery }) {
+  const base = { ...query, year: query.yearInvalid ? "" : query.year };
+  return (
+    <nav class="kind-nav" aria-label={t("actsKindChips")}>
+      {[null, ...KINDS].map((kind) => (
+        <a class="kind-link" href={actsQueryString({ ...base, kind }, 1)} aria-current={query.kind === kind ? "true" : undefined}>
+          {kind === null ? t("actsStatusAny") : kindPlural(kind)}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 function FilterForm({ query }: { query: ActsQuery }) {
   return (
     <form class="filters" method="get" action="/acte" novalidate data-filter="">
+      <div class="form-group filter-top">
+        <label class="label" for="acte-q">
+          {t("actsFilterText")}
+        </label>
+        <input
+          class="field"
+          id="acte-q"
+          type="search"
+          name="q"
+          value={query.q === "" ? undefined : query.q}
+          maxlength={MAX_TEXT}
+          autocomplete="off"
+        />
+      </div>
+      <KindChips query={query} />
+      <MoreFilters open={query.kind !== null || query.year !== "" || query.status !== null}>
       <div class="form-group">
         <label class="label" for="acte-tip">
           {t("actsFilterKind")}
@@ -113,25 +166,12 @@ function FilterForm({ query }: { query: ActsQuery }) {
           </option>
         </select>
       </div>
-      <div class="form-group">
-        <label class="label" for="acte-q">
-          {t("actsFilterText")}
-        </label>
-        <input
-          class="field"
-          id="acte-q"
-          type="search"
-          name="q"
-          value={query.q === "" ? undefined : query.q}
-          maxlength={MAX_TEXT}
-          autocomplete="off"
-        />
-      </div>
       <div class="form-group submit">
         <button class="btn" type="submit">
           {t("actsFilterApply")}
         </button>
       </div>
+      </MoreFilters>
     </form>
   );
 }

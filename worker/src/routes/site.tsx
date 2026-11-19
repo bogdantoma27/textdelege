@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { type AppEnv, NoBuildError, type SitemapEntry, type Store } from "../lib/store";
+import { domainSitemapPaths } from "../lib/domain-changes"; /* domain-changes */
 import { actUrl, articleUrl } from "../lib/urls";
 import { ORIGIN } from "../views/layout";
 import { NotFound } from "../views/not-found";
@@ -105,12 +106,21 @@ async function sitemapRows(store: Store, n: number): Promise<string[] | null> {
   return [...fixed, ...entries.map((entry) => urlEntry(entryPath(entry), entry.lastmod))];
 }
 
+/* domain-changes: the month pages are not in the sitemap files of the build; they go on the last page. */
+async function withDomainPages(store: Store, n: number, rows: string[]): Promise<string[]> {
+  const index = await store.sitemapIndex();
+  const last = index === null ? Math.ceil((FIXED_PAGES.length + (await store.legacySitemapTotal())) / SITEMAP_SIZE) : index.pages;
+  if (n !== last) return rows;
+  return [...rows, ...(await domainSitemapPaths(store)).map((path) => urlEntry(path, null))];
+}
+
 siteRoutes.get("/:name{sitemap-[1-9][0-9]*\\.xml}", async (c) => {
   const n = Number(/^sitemap-(\d+)\.xml$/.exec(c.req.param("name"))?.[1]);
   const rows = await sitemapRows(c.get("store"), n);
   if (rows === null) return c.notFound();
+  const all = await withDomainPages(c.get("store"), n, rows); /* domain-changes */
   return c.body(
-    `${XML_HEADER}<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${rows.join("")}</urlset>
+    `${XML_HEADER}<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${all.join("")}</urlset>
 `,
     200,
     { "Content-Type": XML_TYPE },

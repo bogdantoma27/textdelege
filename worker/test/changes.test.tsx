@@ -403,6 +403,17 @@ describe("change filters", () => {
     expect(await (await get("/modificari.atom?q=%20%20")).text()).not.toContain("?q=");
   });
 
+  it("puts the fields other than the search behind the Filtre button, open only when one is in use", async () => {
+    const closed = await (await get("/modificari")).text();
+    expect(closed).toContain('<details class="more-filters"><summary class="btn secondary">');
+    expect(closed.indexOf('id="filter-q"')).toBeLessThan(closed.indexOf('<details class="more-filters"'));
+    expect(closed.indexOf('<details class="more-filters"')).toBeLessThan(closed.indexOf('id="filter-verb"'));
+    expect(closed).not.toContain('class="kind-nav"');
+    const open = await (await get("/modificari?verb=repealed")).text();
+    expect(open).toMatch(/<details class="more-filters" open/);
+    expect(await (await get("/modificari?q=civil")).text()).toContain('<details class="more-filters"><summary');
+  });
+
   it("shows the search field first in the form, the zero count for no match and keeps the text in the links", async () => {
     const html = await (await get("/modificari?q=nimic+de+gasit")).text();
     expect(html).toContain('<label class="label" for="filter-q">Caută în modificări</label>');

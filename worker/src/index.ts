@@ -13,6 +13,7 @@ import { pointInTimeRoutes } from "./routes/pointInTime";
 import { rulingRoutes } from "./routes/ruling";
 import { searchRoutes } from "./routes/search";
 import { actsRoutes } from "./routes/acts";
+import { domainChangesRoutes } from "./routes/domain-changes"; /* domain-changes */
 import { errorHandler, notFoundHandler, siteRoutes } from "./routes/site";
 import { ORIGIN } from "./views/layout";
 
@@ -67,6 +68,7 @@ app.route("/", siteRoutes);
 app.route("/", homeRoutes);
 app.route("/", searchRoutes);
 app.route("/", actsRoutes);
+app.route("/", domainChangesRoutes); /* domain-changes */
 app.route("/", changesRoutes);
 app.route("/", articleRoutes);
 app.route("/", compareRoutes);

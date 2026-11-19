@@ -135,3 +135,35 @@ export function kindPlural(kind: string): string {
   const key = KIND_PLURALS[kind];
   return key === undefined ? t("pitKindOther") : t(key);
 }
+
+const KIND_LABELS: Record<string, Key> = {
+  lege: "kindLege",
+  law: "kindLege",
+  oug: "kindOug",
+  og: "kindOg",
+  hg: "kindHg",
+  decret: "kindDecret",
+  "decret-lege": "kindDecretLege",
+  constitutie: "kindConstitutie",
+  constitution: "kindConstitutie",
+  cod: "kindCod",
+  code: "kindCod",
+  "hotarare-parlament": "kindHotarareParlament",
+  norma: "kindNorma",
+  regulament: "kindRegulament",
+  decizie: "kindDecizie",
+  circulara: "kindCirculara",
+  hotarare: "kindHotarare",
+  instructiuni: "kindInstructiuni",
+  metodologie: "kindMetodologie",
+  procedura: "kindProcedura",
+  ghid: "kindGhid",
+  criterii: "kindCriterii",
+  precizari: "kindPrecizari",
+  protocol: "kindProtocol",
+};
+
+export function kindLabel(kind: string): string | null {
+  const key = KIND_LABELS[kind];
+  return key === undefined ? null : t(key);
+}

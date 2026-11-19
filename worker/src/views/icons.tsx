@@ -99,3 +99,11 @@ export function CopyIcon({ size = 16 }: IconProps) {
     </svg>
   );
 }
+
+export function WarningIcon({ size = 18 }: IconProps) {
+  return (
+    <svg class="warning-icon" width={size} height={size} {...stroke}>
+      <path d="M10.3 3.9 2.4 17.6A2 2 0 0 0 4.1 20.6h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01" />
+    </svg>
+  );
+}

@@ -19,13 +19,14 @@ import { headingPathIndexes, headingText, headingsBefore, lastHeadingBefore } fr
 import { resolveView } from "../lib/versions";
 import { Paragraph } from "./article";
 import { CitationPanel, Contents, Freshness, FreshnessWarning, freshnessIsOk, freshnessLine } from "./article-rails";
-import { Breadcrumbs, DataTable, ErrorSummary, FieldError, Pagination, Panel, Support, Tabs, DatedNote } from "./components";
+import { Breadcrumbs, ErrorSummary, FieldError, Pagination, Panel, Support, Tabs, DatedNote } from "./components";
 import { Indexed } from "./indexed";
 import { Layout, ORIGIN } from "./layout";
 import { parseActStatus } from "../lib/status";
-import { BADGES, LawLink, STATE_BADGE_ID, STATE_LABEL, StatusBadge, lawLabelText, outcomeText, type BadgeId } from "./shared";
+import { BADGES, LawLink, STATE_BADGE_ID, STATE_LABEL, StatusBadge, outcomeText, type BadgeId } from "./shared";
 import type { ActNames } from "./changes";
 import { ChangesMade } from "./law";
+import { actDescription, actJsonLd } from "./seo";
 
 export type ActTab = "text" | "istoric" | "jurisprudenta" | "statistici" | "date";
 
@@ -129,6 +130,7 @@ function Header(props: { ctx: ActContext; act: ActObject; actRef: string; tab: A
   facts.push({ label: t("sourceOfficial"), value: <a href={official}>{hostOf(official)}</a> });
 
   const note = freshnessLine(act);
+  const showDate = props.tab === "text";
 
   return (
     <>
@@ -143,7 +145,7 @@ function Header(props: { ctx: ActContext; act: ActObject; actRef: string; tab: A
           )
         }
       />
-      {ctx.invalid !== undefined && <ErrorSummary items={[{ href: "#data", text: t("dateInvalid") }]} />}
+      {showDate && ctx.invalid !== undefined && <ErrorSummary items={[{ href: "#data", text: t("dateInvalid") }]} />}
       <p class="caption">{kind === undefined ? identifier : `${t(kind)} ${identifier}`}</p>
       <h1>{actName(act)}</h1>
       <div class="status">
@@ -157,6 +159,7 @@ function Header(props: { ctx: ActContext; act: ActObject; actRef: string; tab: A
       </div>
       <FreshnessWarning act={act} />
       {note !== null && <p class="fresh-line">{note}</p>}
+      {showDate && (
       <section class="time compact" aria-label={t("timePanelActLabel")}>
         <form class={ctx.invalid === undefined ? "date-form" : "date-form error"} method="get" action={actUrl(actRef)} novalidate data-filter="">
           <label class="label" for="data">
@@ -171,6 +174,7 @@ function Header(props: { ctx: ActContext; act: ActObject; actRef: string; tab: A
           </div>
         </form>
       </section>
+      )}
       <Tabs
         label={t("actTabsLabel")}
         tabs={TABS.map((item) => ({
@@ -196,13 +200,13 @@ function DatePicker({ act, ctx }: { act: ActObject; ctx: ActContext }) {
     shown = today ? "" : (before ?? days.at(-1))?.date ?? "";
   }
   const label = (entry: TimelineEntry) => {
-    const named = [...entry.laws].sort((a, b) => Number(lawUrlFromKey(a.key) === null) - Number(lawUrlFromKey(b.key) === null));
-    const law = named[0] === undefined ? undefined : lawLabelText(named[0].key, named[0].label);
+    const named = entry.laws.filter((law) => lawUrlFromKey(law.key) !== null);
+    const law = named[0]?.label;
     const text =
       law === undefined
         ? formatRo(entry.date)
-        : entry.laws.length > 1
-          ? t("timeOptionMore", { date: formatRo(entry.date), law, n: entry.laws.length - 1 })
+        : named.length > 1
+          ? t("timeOptionMore", { date: formatRo(entry.date), law, n: named.length - 1 })
           : t("timeOption", { date: formatRo(entry.date), law });
     return entry.date > ctx.now ? `${text} ${t("timeOptionFuture")}` : text;
   };
@@ -414,37 +418,61 @@ function History(props: {
   const rows = historyRows(act, ctx.now);
   const earliest = rows.reduce((min, row) => (row.date < min ? row.date : min), rows[0]?.date ?? "");
   const path = `/${actRef}/istoric`;
+  const namedLaws = (row: HistoryRow) => row.laws.filter((law) => lawUrlFromKey(law.key) !== null);
+  const unnamed = paged.items.some((row) => namedLaws(row).length === 0);
+  const years: { year: string; rows: HistoryRow[] }[] = [];
+  for (const row of paged.items) {
+    const year = row.date.slice(0, 4);
+    const last = years[years.length - 1];
+    if (last?.year === year) last.rows.push(row);
+    else years.push({ year, rows: [row] });
+  }
   return (
     <section>
       <h2>{t("histHeading")}</h2>
       {rows.length === 0 ? (
         <p>{t("histNone")}</p>
       ) : (
-        <DataTable
-          head={[
-            t("historyDate"),
-            t("histLaw"),
-            t("histArticles"),
-            t("histState"),
-            t("historyAction"),
-          ]}
-          rows={paged.items.map((row) => [
-            formatRo(row.date),
-            row.laws.map((law, index) => (
-              <>
-                {index > 0 && ", "}
-                <LawLink lawKey={law.key} label={law.label} />
-              </>
-            )),
-            String(row.articles),
-            <StatusBadge id={row.pending ? "pending" : "applied"} />,
-            row.date === earliest ? (
-              <a href={actUrl(actRef, row.date)}>{t("viewInitial")}</a>
-            ) : (
-              <a href={compareUrl(actRef, null, dayBefore(row.date), row.date)}>{t("cmpCompare")}</a>
-            ),
-          ])}
-        />
+        <>
+          {unnamed && <p class="hist-note">{t("histUnnamedNote")}</p>}
+          {years.map((group) => (
+            <div class="hist-year">
+              <h3>{group.year}</h3>
+              <ul class="hist-list">
+                {group.rows.map((row) => {
+                  const laws = namedLaws(row);
+                  return (
+                    <li>
+                      <div>
+                        <b class="hist-date">{formatRo(row.date)}</b>
+                        <span class="hist-sub">
+                          {row.articles === 1 ? t("histArticlesOne") : t("histArticlesMany", { n: row.articles })}
+                          {laws.map((law, index) => (
+                            <>
+                              {index === 0 ? " · " : ", "}
+                              <LawLink lawKey={law.key} label={law.label} />
+                            </>
+                          ))}
+                          {row.pending && (
+                            <>
+                              {" "}
+                              <StatusBadge id="pending" />
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      {row.date === earliest ? (
+                        <a href={actUrl(actRef, row.date)}>{t("viewInitial")}</a>
+                      ) : (
+                        <a href={compareUrl(actRef, null, dayBefore(row.date), row.date)}>{t("cmpCompare")}</a>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </>
       )}
       <Pages
         paged={paged}
@@ -528,20 +556,33 @@ function Statistics(props: { act: ActObject; actRef: string }) {
       {years.length === 0 ? (
         <p>{t("statsNone")}</p>
       ) : (
-        <DataTable
-          head={[t("statsYear"), t("statsCount")]}
-          rows={years.map(([year, count]) => [
-            year,
-            <div class="bars">
-              <span
-                class="bar"
-                style={`width:${Math.round((count / max) * 1000) / 10}%`}
-                aria-hidden="true"
-              />
-              <b>{count}</b>
-            </div>,
-          ])}
-        />
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr>
+                <th scope="col">{t("statsYear")}</th>
+                <th scope="col">{t("statsCount")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {years.map(([year, count]) => (
+                <tr>
+                  <td>{year}</td>
+                  <td>
+                    <div class="bars">
+                      <span
+                        class="bar"
+                        style={`width:${Math.round((count / max) * 1000) / 10}%`}
+                        aria-hidden="true"
+                      />
+                      <b>{count}</b>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {most.length > 0 && (
         <>
@@ -635,8 +676,10 @@ export function renderAct(
   return (
     <Layout
       title={title}
-      description={act.title}
+      description={actDescription(act, ctx.date, ctx.now)}
       canonical={canonical}
+      ogType="article"
+      jsonLd={tab === "text" ? actJsonLd(act, actRef) : undefined}
       noindex={ctx.invalid !== undefined}
       script="/article.js"
       toc={
