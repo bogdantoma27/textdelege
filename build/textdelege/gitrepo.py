@@ -4,7 +4,7 @@ import stat
 import subprocess
 import threading
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 LOG_FIELDS = "%H%x1f%aN%x1f%aE%x1f%(trailers:only,unfold)"
@@ -31,6 +31,8 @@ class Commit:
     author: str
     author_email: str
     trailers: dict[str, list[str]]
+    # For a correction: the commit it re-asserts or corrects, once resolved (see selection.py).
+    origin: "Commit | None" = field(default=None, compare=False)
 
 
 def run_git(

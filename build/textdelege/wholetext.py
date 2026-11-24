@@ -13,7 +13,7 @@ from .extract import (
     line_id,
 )
 from .gitrepo import GitRepo
-from .selection import act_commits, commit_for_day, in_force_days, kind_of
+from .selection import act_commits, commit_for_day, in_force_days, kind_of, source_of
 
 TEXT_FILE = "text.md"
 ARTICLE_FILE = "art-text.md"
@@ -66,7 +66,7 @@ def whole_text_core(
             selected = commit_for_day(commits, span.from_)
             ids: list[str] = []
             lines = []
-            law_key = law_key_from_email(selected.author_email)
+            law_key = law_key_from_email(source_of(selected).author_email)
             for text in paragraphs(reader.read(span.blob)):
                 ids.append(line_id(text, ids))
                 lines.append(Line(text, ids[-1], span.from_, law_key))
@@ -77,8 +77,8 @@ def whole_text_core(
                     commit=selected.sha,
                     law_commit=selected.sha,
                     law_key=law_key,
-                    law_label=selected.author,
-                    kind=kind_of(selected),
+                    law_label=source_of(selected).author,
+                    kind=kind_of(source_of(selected)),
                     source_path=f"{used_folders[span.from_].rstrip('/')}/{TEXT_FILE}",
                     lines=lines,
                 )
@@ -88,7 +88,7 @@ def whole_text_core(
     removed_by_key = removed_by_label = None
     if absent is not None:
         remover = commit_for_day(commits, absent)
-        removed_by_key, removed_by_label = law_key_from_email(remover.author_email), remover.author
+        removed_by_key, removed_by_label = law_key_from_email(source_of(remover).author_email), source_of(remover).author
     return [ArticleCore(ARTICLE_FILE, ARTICLE_NUMBER, None, versions, absent, removed_by_key, removed_by_label)]
 
 

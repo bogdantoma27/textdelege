@@ -95,7 +95,7 @@ class EventsTest(unittest.TestCase):
         )
         self.assertEqual(events_for(art)[0].verb, "modified")
 
-    def test_correction_kind_is_restated(self):
+    def test_correction_without_resolved_original_is_restated(self):
         art = make(
             [
                 version(date(2020, 1, 1), date(2020, 12, 31), lines(A1)),

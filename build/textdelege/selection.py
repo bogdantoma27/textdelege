@@ -1,4 +1,5 @@
 import re
+from dataclasses import replace
 from datetime import date
 
 from .gitrepo import Commit, GitRepo
@@ -19,13 +20,47 @@ def kind_of(commit: Commit) -> str:
     return values[0] if values else ""
 
 
+def source_of(commit: Commit) -> Commit:
+    """The commit that carries the amending act of this one: the original a correction points to."""
+    return commit.origin or commit
+
+
+def _correction_target(commit: Commit) -> str | None:
+    for key in ("Re-asserts", "Corrects"):
+        values = commit.trailers.get(key) or []
+        if values and values[0].strip():
+            return values[0].strip()
+    return None
+
+
+def _original_of(commit: Commit, by_sha: dict[str, Commit]) -> Commit | None:
+    """Follow Re-asserts/Corrects from a correction to the first non-correction commit.
+
+    None when the chain ends at a commit outside the log or loops back on itself.
+    """
+    seen = {commit.sha}
+    current = commit
+    while kind_of(current) == "correction":
+        target = _correction_target(current)
+        current = by_sha.get(target) if target else None
+        if current is None or current.sha in seen:
+            return None
+        seen.add(current.sha)
+    return current
+
+
 def act_commits(repo: GitRepo, folder: str, old_folder: str | None) -> list[Commit]:
     paths = [folder] + ([old_folder] if old_folder else [])
-    return [
-        commit
-        for commit in repo.log(paths)
-        if in_force_of(commit) is not None and kind_of(commit) not in EXCLUDED_KINDS
-    ]
+    log = repo.log(paths)
+    by_sha = {commit.sha: commit for commit in log}
+    commits = []
+    for commit in log:
+        if in_force_of(commit) is None or kind_of(commit) in EXCLUDED_KINDS:
+            continue
+        if kind_of(commit) == "correction":
+            commit = replace(commit, origin=_original_of(commit, by_sha))
+        commits.append(commit)
+    return commits
 
 
 def in_force_days(commits: list[Commit]) -> list[date]:

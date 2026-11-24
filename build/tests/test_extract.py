@@ -325,6 +325,49 @@ class ExtractTest(unittest.TestCase):
         )
         self.assertEqual(version_on(art, date(2020, 6, 1)).commit, first)
 
+    def correction(self, text, in_force, **pointer):
+        return self.fixture.commit(
+            {f"{FOLDER}/art-0001.md": text},
+            author="Lexifina",
+            trailers={"Kind": "correction", "In-force": in_force, **pointer},
+            message="Correction",
+        )
+
+    def test_correction_takes_law_and_kind_from_re_asserted_commit(self):
+        self.commit({"art-0001.md": article(1, "(1) A")}, "2020-01-01")
+        original = self.commit({"art-0001.md": article(1, "(1) A", "(2) B")}, "2021-01-01", LAW_2021)
+        fixed = self.correction(article(1, "(1) A", "(2) B!"), "2021-01-01", **{"Re-asserts": original})
+        versions = self.by_file()["art-0001.md"].versions
+        self.assertEqual(versions[-1].commit, fixed)
+        self.assertEqual(versions[-1].lines[-1].text, "(2) B!")
+        self.assertEqual((versions[-1].law_key, versions[-1].law_label), ("legea-9-2021", LAW_2021))
+        self.assertEqual(versions[-1].kind, "amendment")
+        (commit,) = [c for c in act_commits(self.repo, FOLDER, None) if c.sha == fixed]
+        self.assertEqual(commit.origin.sha, original)
+
+    def test_correction_with_corrects_trailer_takes_law_from_target(self):
+        first = self.commit({"art-0001.md": article(1, "(1) A")}, "2020-01-01", LAW_2020)
+        self.correction(article(1, "(1) A!"), "2020-01-01", Corrects=first)
+        (version,) = self.by_file()["art-0001.md"].versions
+        self.assertEqual((version.law_key, version.kind), ("legea-55-2020", "amendment"))
+
+    def test_correction_chain_resolves_to_first_non_correction(self):
+        first = self.commit({"art-0001.md": article(1, "(1) A")}, "2020-01-01", LAW_2020)
+        middle = self.correction(article(1, "(1) A!"), "2020-01-01", Corrects=first)
+        self.correction(article(1, "(1) A!!"), "2020-01-01", **{"Re-asserts": middle})
+        (version,) = self.by_file()["art-0001.md"].versions
+        self.assertEqual(version.lines[0].text, "(1) A!!")
+        self.assertEqual((version.law_key, version.law_label), ("legea-55-2020", LAW_2020))
+        self.assertEqual(version.kind, "amendment")
+
+    def test_correction_with_missing_target_or_cycle_stays_a_correction(self):
+        self.commit({"art-0001.md": article(1, "(1) A")}, "2020-01-01", LAW_2020)
+        self.correction(article(1, "(1) A!"), "2021-01-01", Corrects="0" * 40)
+        self.correction(article(1, "(1) A!!"), "2022-01-01")
+        versions = self.by_file()["art-0001.md"].versions
+        self.assertEqual([v.kind for v in versions], ["amendment", "correction", "correction"])
+        self.assertEqual([v.law_label for v in versions[1:]], ["Lexifina", "Lexifina"])
+
     def test_attribution_uses_file_history_not_act_commit(self):
         self.commit(
             {"art-0001.md": article(1, "A"), "art-0002.md": article(2, "x")},

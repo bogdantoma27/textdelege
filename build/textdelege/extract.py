@@ -11,6 +11,7 @@ from .selection import (
     in_force_days,
     in_force_of,
     kind_of,
+    source_of,
     tree_and_folder_for_day,
 )
 
@@ -265,13 +266,16 @@ def _extract_core(
             blob_text[blob] = reader.read(blob)
         return blob_text[blob]
 
+    resolved = {commit.sha: commit for commit in commits}
+
     def attribute(name: str, day: date, fallback: Commit) -> tuple[Commit, str, str]:
         source = next(
             (c for c in touching.get(name, []) if in_force_of(c) <= day),
             fallback,
         )
-        law_key = law_key_from_email(source.author_email)
-        law_label = source.author
+        source = resolved.get(source.sha, source)
+        law_key = law_key_from_email(source_of(source).author_email)
+        law_label = source_of(source).author
         credited = credits.get((in_force_of(source).isoformat(), name.removesuffix(".md")))
         if credited is not None:
             if credited:
@@ -300,7 +304,7 @@ def _extract_core(
                     law_commit=source.sha,
                     law_key=law_key,
                     law_label=law_label,
-                    kind=kind_of(source),
+                    kind=kind_of(source_of(source)),
                     source_path=f"{used_folders[span.from_].rstrip('/')}/{name}",
                     lines=lines,
                 )
