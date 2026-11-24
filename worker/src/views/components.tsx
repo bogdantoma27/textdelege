@@ -394,10 +394,10 @@ export function PageNumbers(props: { current: number; pages: number; href: (page
   );
 }
 
-export function DataTable({ head, rows }: { head: string[]; rows: Child[][] }) {
+export function DataTable({ head, rows, class: extra }: { head: string[]; rows: Child[][]; class?: string }) {
   return (
     <div class="table-wrap">
-      <table class="data stack">
+      <table class={extra ? `data stack ${extra}` : "data stack"}>
         <thead>
           <tr>
             {head.map((cell) => (

@@ -108,6 +108,7 @@ describe("domain change pages", () => {
     expect(domain).toContain("<h1>Ce s-a schimbat în legislația fiscală</h1>");
     expect(domain.indexOf("martie 2026")).toBeLessThan(domain.indexOf("februarie 2026"));
     expect(domain).toContain("1 modificare");
+    expect(domain).toContain('<p class="sub-acts">Include <a href="/codul-fiscal">Codul fiscal</a> (Legea nr. 227/2015).</p>');
     const index = await (await get("/ce-s-a-schimbat")).text();
     expect(index).toContain('href="/ce-s-a-schimbat/fiscal/2026/03"');
     expect(index).toContain("Muncă");

@@ -25,8 +25,10 @@ describe("search", () => {
     expect(html).not.toContain('id="q-overlay"');
     expect(html).toContain('<label class="label" for="q-results">Caută</label>');
     expect(html).toMatch(/<input class="field" id="q-results" type="search" name="q" value="text"/);
-    expect(html).toMatch(/<button class="btn secondary" type="submit">Caută<\/button>/);
+    expect(html).toMatch(/<button class="btn" type="submit">Caută<\/button>/);
     expect(html).toContain("Doar în vigoare");
+    expect(html).toMatch(/<form class="search-filters" action="\/cauta" method="get">/);
+    expect(html).not.toMatch(/<form class="search-filters"[^>]*data-filter/);
   });
 
   it("shows an empty field on the page without a query", async () => {

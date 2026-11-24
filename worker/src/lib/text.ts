@@ -3,6 +3,11 @@ import { t } from "../text";
 import { Indexed } from "../views/indexed";
 import { type ArticleRef, articleUrl, isPlainNumber } from "./urls";
 
+/** An article's opening words for the contents list: dots before the closing "…" go, so it is never doubled. */
+export function leadExcerpt(lead: string): string {
+  return lead.replace(/[.\s]+…$/, "…");
+}
+
 const MARKERS = [
   /^\(\d+(?:\^\d+)?\)/,
   /^[a-z](?:\^\d+)?\)/,

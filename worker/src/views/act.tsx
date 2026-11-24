@@ -18,7 +18,7 @@ import { type ArticleRef, actUrl, articleSlugFor, articleUrl, changesUrl, compar
 import { headingPathIndexes, headingText, headingsBefore, lastHeadingBefore } from "../lib/headings";
 import { resolveView } from "../lib/versions";
 import { Paragraph } from "./article";
-import { CitationPanel, Contents, Freshness, FreshnessWarning, freshnessIsOk, freshnessLine } from "./article-rails";
+import { CitationPanel, Contents, CheckedLine, freshnessIsOk } from "./article-rails";
 import { Breadcrumbs, ErrorSummary, FieldError, Pagination, Panel, Support, Tabs, DatedNote } from "./components";
 import { Indexed } from "./indexed";
 import { Layout, ORIGIN } from "./layout";
@@ -129,7 +129,6 @@ function Header(props: { ctx: ActContext; act: ActObject; actRef: string; tab: A
   }
   facts.push({ label: t("sourceOfficial"), value: <a href={official}>{hostOf(official)}</a> });
 
-  const note = freshnessLine(act);
   const showDate = props.tab === "text";
 
   return (
@@ -155,10 +154,9 @@ function Header(props: { ctx: ActContext; act: ActObject; actRef: string; tab: A
             {fact.label} <b>{fact.value}</b>
           </span>
         ))}
-        {verified && freshnessIsOk(act) && <span class="fact">{t("statusVerified", { date: formatRo(verified) })}</span>}
+        {verified && freshnessIsOk(act, ctx.now) && <span class="fact">{t("statusVerified", { date: formatRo(verified) })}</span>}
       </div>
-      <FreshnessWarning act={act} />
-      {note !== null && <p class="fresh-line">{note}</p>}
+      <CheckedLine act={act} now={ctx.now} />
       {showDate && (
       <section class="time compact" aria-label={t("timePanelActLabel")}>
         <form class={ctx.invalid === undefined ? "date-form" : "date-form error"} method="get" action={actUrl(actRef)} novalidate data-filter="">
@@ -637,9 +635,6 @@ function Rail(props: { ctx: ActContext; act: ActObject; actRef: string }) {
   return (
     <aside class="rail">
       <CitationPanel sentence={sentence} permanent={permanent} current={ctx.date !== null ? actUrl(actRef) : undefined} />
-      <Panel title={t("freshTitle")}>
-        <Freshness act={act} />
-      </Panel>
       <Panel title={t("toolsTitle")}>
         <ul class="plain tools">
           <li>

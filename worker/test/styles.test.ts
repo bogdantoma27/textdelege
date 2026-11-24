@@ -336,7 +336,9 @@ describe("styles.css", () => {
     expect(block(".plain.columns")).toBe(".plain.columns{display:grid;grid-template-columns:repeat(auto-fill,minmax(14em,1fr));gap:0 24px");
     expect(css).toContain(".shell>main:not(:has(~.rail)){grid-column:1/-1}");
     expect(css).not.toContain(".doc :is(p,ul,ol,dl,pre,.summary)");
-    expect(media("(min-width:1360px)")).toContain(".with-contents main .warning.fresh-note,.with-contents main .fresh-line,.with-contents main .src p.fresh-line{display:none}");
+    expect(media("(min-width:1360px)")).not.toContain("fresh");
+    expect(css).not.toContain("fresh-note");
+    expect(css).not.toContain("fresh-panel");
     expect(media("(min-width:1101px)")).toContain(".with-contents main>article,.with-contents main>.solo{padding-top:0}");
     expect(block(".filters .form-group.date")).toBe(".filters .form-group.date{flex:0 1 10em");
     expect(block(".time .date-row")).toBe(".time .date-row{flex-wrap:nowrap;min-width:0;align-items:center");
@@ -542,7 +544,16 @@ describe("styles.css", () => {
     expect(block(".cite")).not.toContain("background");
     expect(block(".cite .addr")).toContain("font-family:var(--mono)");
     expect(block(".rail .plain li")).toContain("border-bottom:1px solid var(--border)");
-    expect(block(".rail .warning")).toContain("border-left:3px solid var(--danger);background:none");
+    expect(css).not.toContain(".rail .warning{");
+  });
+
+  it("draws the freshness line quietly under the status and the date form as a bordered box", () => {
+    expect(block(".checked")).toContain("font-size:var(--xs);line-height:var(--xs-lh);color:var(--secondary)");
+    expect(block(".checked.warn svg")).toContain("color:var(--accent-text)");
+    expect(block(".status:has(+.checked)")).toContain("margin-bottom:12px");
+    expect(block(".at-date>summary")).toContain("min-height:36px");
+    expect(block(".at-date-form")).toContain("border:1px solid var(--border);border-radius:4px;background:var(--paper)");
+    expect(block(".at-date-form .date-row")).toContain("flex-wrap:wrap");
   });
 
   it("keeps the warning text bold in the rail, shows the strike-through and underline in the legend, and keeps hidden diff words out of a copy", () => {
@@ -582,7 +593,6 @@ describe("styles.css", () => {
     expect(coarse).toContain(".status a{display:inline-block;padding:12px 0;margin:-12px 0}");
     expect(coarse).not.toContain(".status>*{padding:12px 0");
     expect(media("(max-width:1359px)")).toContain(".with-contents .shell>.rail{padding:0 0 16px}");
-    expect(media("(max-width:1359px)")).toContain(".rail .fresh-panel{display:none}");
     expect(block(".footer-nav")).toContain("grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px");
     expect(css).toContain("@media (min-width:641px){.footer-nav{grid-template-columns:repeat(3,minmax(0,1fr))");
     expect(block(".search-overlay .sheet-title")).toContain("grid-row:1");
@@ -857,5 +867,32 @@ describe("case law in the rail", () => {
     expect(block(".rail .ruling-list")).toContain(
       "max-height:calc(6.5 * (2 * var(--xs-lh) + 17px));overflow-y:auto;overscroll-behavior:contain",
     );
+  });
+});
+
+describe("phone fixes", () => {
+  it("wraps the article tools instead of scrolling them, with an icon-only compare chip", () => {
+    const tools = block(".tools", css.slice(css.indexOf("/* article-page */")));
+    expect(tools).toContain("flex-wrap:wrap");
+    expect(tools).not.toContain("overflow-x");
+    expect(css).toContain(".tools .compare-links a.icon,.tools .compare-links .off.icon{justify-content:center;width:40px;padding:0}");
+  });
+
+  it("packs the act tabs, lifts the footer links and keeps the footer flush without the viewport trick on phones", () => {
+    expect(phone).toContain(".tabs-list{gap:10px}");
+    expect(phone).toContain(".footer-line a,.site-footer .footer-col a{display:inline-flex;align-items:center;min-height:32px}");
+    expect(phone).toContain(".shell>.site-footer,.with-contents .shell>.site-footer{margin-right:-16px;margin-left:-16px}");
+  });
+
+  it("shows each change as three lines on phones, only in the changes table", () => {
+    expect(phone).toContain(".data.changes tr{display:flex;flex-wrap:wrap");
+    expect(phone).toContain(".data.changes td:nth-child(5):empty{display:none}");
+    expect(block(".data .by")).toContain("display:none");
+  });
+
+  it("balances search hit headings, limits the act subject line and styles the domain acts line small", () => {
+    expect(block(".hits .hit-head")).toContain("text-wrap:balance");
+    expect(block(".doc-subject")).toContain("max-width:75ch");
+    expect(block(".sub-acts")).toContain("font-size:var(--s);line-height:var(--s-lh)");
   });
 });

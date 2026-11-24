@@ -1,11 +1,12 @@
 import { t, tPlural } from "../text";
 import type { Key } from "../text";
 import { articleLabel } from "../lib/article-label";
+import { actDesignation } from "../lib/act-list";
 import { formatRo } from "../lib/dates";
 import type { DomainMonth } from "../lib/domain-changes";
 import { type Domain, DOMAINS, domainUrl, monthUrl } from "../lib/domains";
 import { unitText } from "../lib/text";
-import type { ChangeItem } from "../lib/types";
+import type { ActIndexEntry, ChangeItem } from "../lib/types";
 import { articleUrl } from "../lib/urls";
 import { Breadcrumbs } from "./components";
 import { Indexed } from "./indexed";
@@ -80,7 +81,35 @@ export function renderDomainIndex(months: Map<Domain, DomainMonth[]>) {
   );
 }
 
-export function renderDomainPage(domain: Domain, months: DomainMonth[]) {
+function DomainActs({ domain, acts }: { domain: Domain; acts: Map<string, ActIndexEntry> }) {
+  const links = domain.acts.flatMap((path) => {
+    const entry = acts.get(path);
+    if (entry === undefined) return [];
+    const named = actDesignation(entry.title, entry.short);
+    return [
+      <>
+        <a href={`/${entry.alias ?? entry.path}`}>{entry.short ?? entry.title}</a>
+        {named !== null && ` (${named})`}
+      </>,
+    ];
+  });
+  if (links.length === 0) return null;
+  const last = links.length - 1;
+  return (
+    <p class="sub-acts">
+      {t("dcDomainActs").split("{acts}").flatMap((part, i) =>
+        i === 0
+          ? [part]
+          : [
+              ...links.flatMap((link, at) => [at === 0 ? "" : at === last ? t("dcDomainActsAnd") : ", ", link]),
+              part,
+            ],
+      )}
+    </p>
+  );
+}
+
+export function renderDomainPage(domain: Domain, months: DomainMonth[], acts: Map<string, ActIndexEntry>) {
   const phrase = t(domain.phrase);
   const title = t("dcDomainTitle", { phrase });
   const total = months.reduce((sum, item) => sum + item.count, 0);
@@ -93,6 +122,7 @@ export function renderDomainPage(domain: Domain, months: DomainMonth[]) {
       <section class="solo">
         <Breadcrumbs items={[home, root]} current={t(domain.name)} />
         <h1>{title}</h1>
+        <DomainActs domain={domain} acts={acts} />
         <ul class="plain">
           {months.map((item) => (
             <li>

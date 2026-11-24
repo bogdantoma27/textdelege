@@ -34,7 +34,7 @@ function Examples() {
 
 function SearchBox(props: { query: string; inForce: boolean }) {
   return (
-    <form class="search-filters" action="/cauta" method="get" data-filter="">
+    <form class="search-filters" action="/cauta" method="get">
       <label class="label" for="q-results">
         {t("searchFieldLabel")}
       </label>
@@ -48,7 +48,7 @@ function SearchBox(props: { query: string; inForce: boolean }) {
           maxlength={MAX_QUERY}
           autocomplete="off"
         />
-        <button class="btn secondary" type="submit">
+        <button class="btn" type="submit">
           {t("searchButton")}
         </button>
       </div>
@@ -101,7 +101,7 @@ function Hit({ hit, names, acts }: { hit: SearchHit; names: ActNames; acts: Map<
       {entry !== undefined && <ActLine entry={entry} />}
       <h2 class="hit-head">
         <a href={articleUrl(act.ref, hit)}>
-          {act.name}, <Indexed text={articleLabel(hit)} />
+          {act.name}, <Indexed text={articleLabel(hit).replace(/^Art\. /, "Art.\u00a0")} />
           {hit.title ? `: ${hit.title}` : ""}
         </a>
         {hit.state !== "in-force" && (

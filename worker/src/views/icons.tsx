@@ -100,10 +100,21 @@ export function CopyIcon({ size = 16 }: IconProps) {
   );
 }
 
-export function WarningIcon({ size = 18 }: IconProps) {
+export function InfoIcon({ size = 16 }: IconProps) {
   return (
-    <svg class="warning-icon" width={size} height={size} {...stroke}>
-      <path d="M10.3 3.9 2.4 17.6A2 2 0 0 0 4.1 20.6h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01" />
+    <svg width={size} height={size} {...stroke}>
+      <path d="M12 8v5M12 16h.01" />
+      <circle cx="12" cy="12" r="9" />
+    </svg>
+  );
+}
+
+export function CompareIcon({ size = 20 }: IconProps) {
+  return (
+    <svg width={size} height={size} {...stroke}>
+      <rect x="3" y="4" width="7" height="16" rx="1" />
+      <rect x="14" y="4" width="7" height="16" rx="1" />
+      <path d="M6.5 9h0M6.5 13h0M17.5 9h0M17.5 13h0" />
     </svg>
   );
 }

@@ -4,7 +4,15 @@ import { resolveAct } from "../lib/resolve";
 import type { AppEnv } from "../lib/store";
 import { articleUrl, findArticle, parsePath } from "../lib/urls";
 import { versionOn } from "../lib/versions";
-import { renderArticle } from "../views/article";
+import { type ArticleContext, renderArticle } from "../views/article";
+
+function context(params: URLSearchParams): Omit<ArticleContext, "now"> {
+  return {
+    attribution: params.get("atribuire") !== "0",
+    highlightLast: params.get("ultima") === "1",
+    filter: (params.get("cuprins") ?? "").slice(0, 100),
+  };
+}
 
 export const articleRoutes = new Hono<AppEnv>();
 
@@ -24,7 +32,18 @@ articleRoutes.get("*", async (c, next) => {
   const typed = params.get("data");
   if (typed !== null) {
     const parsed = typed.trim() === "" ? "" : parseDate(typed);
-    if (parsed === null) return c.notFound();
+    if (parsed === null) {
+      if (article.versions.length < 2) return c.notFound();
+      return c.html(
+        renderArticle(
+          { ...context(params), now: today(), invalidDate: typed.trim().slice(0, 10) },
+          act,
+          article,
+          null,
+        ),
+        400,
+      );
+    }
     const picked = parsed === today() ? "" : parsed;
     params.delete("data");
     const rest = params.toString();
@@ -44,12 +63,7 @@ articleRoutes.get("*", async (c, next) => {
 
   return c.html(
     renderArticle(
-      {
-        now: today(),
-        attribution: params.get("atribuire") !== "0",
-        highlightLast: params.get("ultima") === "1",
-        filter: (params.get("cuprins") ?? "").slice(0, 100),
-      },
+      { ...context(params), now: today() },
       act,
       article,
       route.date,

@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import app from "../src/index";
-import { actSubject } from "../src/lib/act-list";
+import { actDesignation, actSubject } from "../src/lib/act-list";
 import { normalise } from "../src/lib/citation";
 import { type ActFilter, createStore } from "../src/lib/store";
 import type { ActIndexEntry } from "../src/lib/types";
@@ -319,6 +319,15 @@ describe("the acts page", () => {
     const html = await page("/acte?q=zzzzzz");
     expect(html).toContain("Niciun act nu corespunde filtrelor.");
     expect(html).not.toContain("page-numbers");
+  });
+});
+
+describe("act designations", () => {
+  it("takes the parenthesis, or a bare designation title, and only for short-named acts", () => {
+    expect(actDesignation("Codul muncii (Legea nr. 53/2003)", "Codul muncii")).toBe("Legea nr. 53/2003");
+    expect(actDesignation("Legea nr. 287/2009", "Codul civil")).toBe("Legea nr. 287/2009");
+    expect(actDesignation("Codul civil", "Codul civil")).toBeNull();
+    expect(actDesignation("Codul muncii (Legea nr. 53/2003)", null)).toBeNull();
   });
 });
 

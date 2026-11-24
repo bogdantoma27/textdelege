@@ -1,18 +1,20 @@
 import type { Child } from "hono/jsx";
-import { genitive, t } from "../text";
+import { ageText, genitive, t } from "../text";
 import { tocEntries } from "../lib/act";
+import { actDesignation, titleDesignation } from "../lib/act-list";
 import { articleLabel } from "../lib/article-label";
 import { normalise } from "../lib/citation";
 import { formatRo } from "../lib/dates";
 import { headingsBefore, lastHeadingBefore } from "../lib/headings";
 import { labelFromKey, namesAnAct } from "../lib/law-label";
+import { leadExcerpt } from "../lib/text";
 import type { ActArticleEntry, ActObject, ArticleObject, ArticleState, ArticleVersion } from "../lib/types";
 import { type ArticleRef, actUrl, articleUrl, rulingUrlFromKey, subscribeUrl } from "../lib/urls";
 import { Indexed } from "./indexed";
 import { ORIGIN } from "./layout";
-import { Panel, Support, WarningText } from "./components";
+import { Panel, Support } from "./components";
 import { outcomeText } from "./shared";
-import { ChevronLeftIcon, ChevronRightIcon, WarningIcon } from "./icons";
+import { ChevronLeftIcon, ChevronRightIcon, InfoIcon } from "./icons";
 
 const WINDOW = 30;
 const FILTER_CAP = 100;
@@ -57,7 +59,7 @@ function repealNote(entry: ActArticleEntry, act: ActObject): string {
 
 function entryTip(entry: ActArticleEntry, state: ArticleState, act: ActObject): string | undefined {
   const parts: string[] = [];
-  if (entry.title ?? entry.lead) parts.push((entry.title ?? entry.lead)!);
+  if (entry.title ?? entry.lead) parts.push(entry.title ?? leadExcerpt(entry.lead!));
   if (state === "repealed") parts.push(repealNote(entry, act));
   if (state === "future") parts.push(t("stateFutureShort"));
   return parts.length > 0 ? parts.join(" · ") : undefined;
@@ -167,7 +169,7 @@ export function Contents(props: ContentsProps) {
           {shown.map(({ entry, state }) => {
             const current = entry.file === props.current;
             const label = state === "repealed" ? t("stateRepealedShort") : state === "future" ? t("stateFutureShort") : null;
-            const excerpt = entry.title === null && entry.lead ? entry.lead : null;
+            const excerpt = entry.title === null && entry.lead ? leadExcerpt(entry.lead) : null;
             const text = entry.title ?? excerpt ?? label;
             const starting = seen === Infinity ? [] : headingsBefore(act, entry, seen);
             if (seen !== Infinity) seen = Math.max(seen, entry.heading ?? -1);
@@ -237,13 +239,14 @@ export function Contents(props: ContentsProps) {
 
 export type FreshnessLevel = "ok" | "note" | "warn";
 
-function freshnessOf(act: ActObject): { level: FreshnessLevel; text: string } {
+function freshnessOf(act: ActObject, now: string): { level: FreshnessLevel; text: string } {
   const fresh = act.freshness;
   const name = actName(act);
   const of = genitive(name);
   const label = (key: string | null) =>
     key === null ? null : (act.laws.find((law) => law.key === key)?.label ?? labelFromKey(key));
-  const verified = fresh?.last_verified ? formatRo(fresh.last_verified) : null;
+  const verifiedIso = fresh?.last_verified ?? null;
+  const verified = verifiedIso ? formatRo(verifiedIso) : null;
   const unverified = t("freshUnverified", { act: name });
 
   let level: FreshnessLevel = "note";
@@ -252,7 +255,7 @@ function freshnessOf(act: ActObject): { level: FreshnessLevel; text: string } {
     case "current":
       if (verified) {
         level = "ok";
-        text = t("freshCurrent", { act: name, date: verified });
+        text = "";
       } else {
         text = unverified;
       }
@@ -270,7 +273,7 @@ function freshnessOf(act: ActObject): { level: FreshnessLevel; text: string } {
     }
     case "stale":
       if (verified) level = "warn";
-      text = verified ? t("freshStale", { act: of, date: verified }) : unverified;
+      text = verified ? t("freshStale", { date: verified, age: ageText(verifiedIso!, now) }) : unverified;
       break;
     case "unverified":
       text = unverified;
@@ -290,37 +293,22 @@ function withPortalLink(text: string, act: ActObject): Child[] {
   return text.split(PORTAL_HOST).flatMap((part, i) => (i === 0 ? [part] : [<a href={act.portal}>{PORTAL_HOST}</a>, part]));
 }
 
-export function Freshness({ act }: { act: ActObject }) {
-  const { level, text } = freshnessOf(act);
-  const body = withPortalLink(text, act);
-  return level === "warn" ? <WarningText>{body}</WarningText> : <p>{body}</p>;
-}
-
-export function FreshnessWarning({ act }: { act: ActObject }) {
-  const { level, text } = freshnessOf(act);
-  if (level !== "warn") return null;
-  const cut = text.indexOf(". ");
-  const first = cut < 0 ? text : text.slice(0, cut + 1);
-  const rest = cut < 0 ? "" : text.slice(cut + 1);
+export function CheckedLine({ act, now }: { act: ActObject; now: string }) {
+  const { level, text } = freshnessOf(act, now);
+  if (level === "ok") return null;
   return (
-    <div class="warning fresh-note">
-      <WarningIcon />
-      <div class="warning-text">
-        <span class="vh">{t("warningLabel")}: </span>
-        <b>{withPortalLink(first, act)}</b>
-        {withPortalLink(rest, act)}
-      </div>
-    </div>
+    <p class={level === "warn" ? "checked warn" : "checked"}>
+      <InfoIcon />
+      <span>
+        {level === "warn" && <span class="vh">{t("warningLabel")}: </span>}
+        {withPortalLink(text, act)}
+      </span>
+    </p>
   );
 }
 
-export function freshnessIsOk(act: ActObject): boolean {
-  return freshnessOf(act).level === "ok";
-}
-
-export function freshnessLine(act: ActObject): Child[] | null {
-  const { level, text } = freshnessOf(act);
-  return level === "note" ? withPortalLink(text, act) : null;
+export function freshnessIsOk(act: ActObject, now: string): boolean {
+  return freshnessOf(act, now).level === "ok";
 }
 
 function RulingLink({ rulingKey, label }: { rulingKey: string; label: string }) {
@@ -373,21 +361,23 @@ ${permanent}`}
 
 export function citationOf(props: RailProps): { sentence: string; permanent: string } {
   const { act, article, actRef, date, now, version } = props;
+  const ref = articleLabel(article, act.articles);
+  const when = formatRo(date ?? now);
+  const named = actDesignation(act.title, act.short);
+  const fallback = titleDesignation(act.title);
   return {
     permanent: `${ORIGIN}${articleUrl(actRef, article, version.from)}`,
-    sentence: t("citeSentence", {
-      ref: articleLabel(article, act.articles),
-      act: actName(act),
-      date: formatRo(date ?? now),
-    }),
+    sentence:
+      act.short !== null && named !== null && named !== act.short
+        ? t("citeSentenceNamed", { ref, designation: named, name: act.short, date: when })
+        : t("citeSentence", { ref, designation: act.short === null ? fallback : (named ?? act.short), date: when }),
   };
 }
 
 export function Rail(props: RailProps) {
-  const { act, article, actRef, date, now, version, keep } = props;
+  const { act, article, actRef, date, now, version } = props;
   const { sentence, permanent } = citationOf(props);
   const inForce = article.versions.filter((v) => v.from <= now).at(-1);
-  const upcoming = article.versions.find((v) => v.from > now && v !== version);
   const wholeAct = date
     ? t("toolWholeActOn", { act: actName(act), date: formatRo(date) })
     : t("toolWholeAct", { act: actName(act) });
@@ -413,16 +403,6 @@ export function Rail(props: RailProps) {
           </ul>
         </Panel>
       )}
-      <Panel title={t("freshTitle")} class="fresh-panel">
-        <Freshness act={act} />
-        {upcoming && (
-          <p>
-            <a href={articleUrl(actRef, article, upcoming.from) + keep}>
-              {t("freshNextVersion", { date: formatRo(upcoming.from) })}
-            </a>
-          </p>
-        )}
-      </Panel>
       <Panel title={t("toolsTitle")}>
         <ul class="plain">
           <li>

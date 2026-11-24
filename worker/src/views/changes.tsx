@@ -70,6 +70,7 @@ export function changeCells(item: ChangeItem, names: ActNames, scheduled = false
     changeAction(item),
     item.law ? (
       <span class="nowrap">
+        <span class="by">{t("changesBy")} </span>
         <LawLink lawKey={item.law.key} label={item.law.label} />
       </span>
     ) : (
@@ -313,6 +314,7 @@ export function renderChanges(page: ChangesPage) {
               <section id="in-curand" aria-labelledby="in-curand-titlu">
                 <h2 id="in-curand-titlu">{t("changesUpcoming")}</h2>
                 <DataTable
+                  class="changes"
                   head={changesHead()}
                   rows={upcoming.map((item) => changeCells(item, page.names, true))}
                 />
@@ -331,6 +333,7 @@ export function renderChanges(page: ChangesPage) {
                 </>
               ) : (
                 <DataTable
+                  class="changes"
                   head={changesHead()}
                   rows={shown.map((item) => changeCells(item, page.names))}
                 />

@@ -197,7 +197,7 @@ describe("act header", () => {
       expect(footer, path).toContain('href="/despre"');
       expect(footer, path).toContain('href="https://ko-fi.com/bogdantoma27"');
       expect(footer, path).toContain('class="footer-meta"');
-      for (const title of ["Citare", "Actualitate", "Unelte", "Susține"]) {
+      for (const title of ["Citare", "Unelte", "Susține"]) {
         expect(rail).toContain('<a class="btn kofi" href="https://ko-fi.com/bogdantoma27">');
         expect(rail, `${path} ${title}`).toContain(`<h2>${title}</h2>`);
       }
@@ -248,7 +248,7 @@ describe("act header", () => {
   it("shows the rails on every tab", async () => {
     for (const [path] of TABS) {
       const html = await page(path);
-      expect(html).toContain("<h2>Actualitate</h2>");
+      expect(html).not.toContain("<h2>Actualitate</h2>");
       expect(html).toContain("<h2>Citare</h2>");
       expect(html).toContain("<h2>Unelte</h2>");
       expect(html).toContain(
@@ -399,24 +399,25 @@ describe("contents", () => {
     }
   });
 
-  it("shows a warning box under the status row when the text may be out of date or an amendment is missing, and a muted line when unverified", () => {
+  it("shows a quiet line under the status row when the text may be out of date or an amendment is missing, and a calm one when unverified", () => {
     const stale = structuredClone(codul);
     stale.freshness = { ...stale.freshness!, status: "stale" };
     const html = view("text", {}, stale);
     expect(html).toMatch(
-      /<h1>Codul civil<\/h1><div class="status">[^]*?<\/div><div class="warning fresh-note"><svg class="warning-icon"[^]*?<\/svg><div class="warning-text"><span class="vh">[^<]*<\/span><b>Textul poate să nu fie la zi\.<\/b>[^]*?a fost la[^]*?<\/div><\/div><section class="time compact"/,
+      /<h1>Codul civil<\/h1><div class="status">[^]*?<\/div><p class="checked warn"><svg[^]*?<\/svg><span><span class="vh">Atenție: <\/span>Verificat față de <a href="[^"]*">legislatie\.just\.ro<\/a> la [\d.]+, [^<]*\. Modificările de după această dată pot lipsi\.<\/span><\/p><section class="time compact"/,
     );
     expect(html).not.toContain("fresh-line");
-    expect(view("text", { date: "2012-01-01" }, stale)).toContain('class="warning fresh-note"');
+    expect(html).not.toContain("fresh-note");
+    expect(view("text", { date: "2012-01-01" }, stale)).toContain('class="checked warn"');
     const unverified = structuredClone(codul);
     unverified.freshness = { ...unverified.freshness!, status: "unverified" };
     const calm = view("text", {}, unverified);
-    expect(calm).toContain('<p class="fresh-line">');
-    expect(calm).not.toContain("fresh-note");
+    expect(calm).toContain('<p class="checked"><svg');
+    expect(calm).not.toContain("checked warn");
     const missing = structuredClone(codul);
     missing.freshness = { ...missing.freshness!, status: "pending-change", newest_change: missing.laws[0]!.key, change_in_repo: false };
     const boxed = view("text", {}, missing);
-    expect(boxed).toMatch(/<\/div><div class="warning fresh-note"><svg class="warning-icon"[^]*?<\/svg><div class="warning-text">[^]*?<\/div><\/div><section class="time compact"/);
+    expect(boxed).toMatch(/<\/div><p class="checked warn"><svg[^]*?<\/svg><span><span class="vh">Atenție: <\/span>[^]*?<\/span><\/p><section class="time compact"/);
     expect(boxed).not.toContain("fresh-line");
   });
 

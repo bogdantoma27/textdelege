@@ -1,6 +1,18 @@
 import { jsx } from "hono/jsx";
 import { describe, expect, it } from "vitest";
-import { hangingParagraph, linkCrossReferences, parseUnit, unmarkStopWords } from "../src/lib/text";
+import { hangingParagraph, leadExcerpt, linkCrossReferences, parseUnit, unmarkStopWords } from "../src/lib/text";
+
+describe("leadExcerpt", () => {
+  it.each([
+    ["părților.…", "părților…"],
+    ["părților....…", "părților…"],
+    ["părților …", "părților…"],
+    ["părților…", "părților…"],
+    ["Text complet.", "Text complet."],
+  ])("turns %j into %j", (lead, shown) => {
+    expect(leadExcerpt(lead)).toBe(shown);
+  });
+});
 
 describe("hangingParagraph", () => {
   it.each([

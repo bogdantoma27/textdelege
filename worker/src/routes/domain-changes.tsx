@@ -21,9 +21,10 @@ domainChangesRoutes.get("/ce-s-a-schimbat/:domain/:year?/:month?", async (c) => 
   const { year, month } = c.req.param();
   if ((year === undefined) !== (month === undefined)) return c.notFound();
   const store = c.get("store");
-  const months = await domainMonths(store, await store.actsByPath(domain.acts), domain);
+  const acts = await store.actsByPath(domain.acts);
+  const months = await domainMonths(store, acts, domain);
   if (year === undefined || month === undefined) {
-    return months.length === 0 ? c.notFound() : c.html(renderDomainPage(domain, months));
+    return months.length === 0 ? c.notFound() : c.html(renderDomainPage(domain, months, acts));
   }
   const key = `${year}-${month}`;
   if (!/^\d{4}$/.test(year) || !MONTH.test(key)) return c.notFound();

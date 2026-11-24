@@ -42,3 +42,20 @@ export function tPlural(
 ): string {
   return t(keys[pluralForm(n)], { n, ...vars });
 }
+
+const DAY_MS = 86_400_000;
+
+export function ageText(from: string, now: string): string {
+  const [fy, fm, fd] = from.split("-").map(Number) as [number, number, number];
+  const [ny, nm, nd] = now.split("-").map(Number) as [number, number, number];
+  const days = Math.round((Date.UTC(ny, nm - 1, nd) - Date.UTC(fy, fm - 1, fd)) / DAY_MS);
+  if (days <= 0) return t("ageToday");
+  const months = (ny - fy) * 12 + (nm - fm) - (nd < fd ? 1 : 0);
+  if (months < 1) {
+    return tPlural(days, { one: "ageDaysOne", few: "ageDaysFew", many: "ageDaysMany" });
+  }
+  if (months < 12) {
+    return tPlural(months, { one: "ageMonthsOne", few: "ageMonthsFew", many: "ageMonthsMany" });
+  }
+  return tPlural(Math.floor(months / 12), { one: "ageYearsOne", few: "ageYearsFew", many: "ageYearsMany" });
+}

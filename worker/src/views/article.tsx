@@ -15,10 +15,13 @@ import { linkableNumbers, unitText } from "../lib/text";
 import { headingPath, headingText } from "../lib/headings";
 import { type View, resolveView } from "../lib/versions";
 import { SOURCE_REPOSITORY, actUrl, articleUrl, compareUrl, sourceFileUrl } from "../lib/urls";
-import { Rail, Contents, FreshnessWarning, freshnessIsOk, freshnessLine, citationOf, type RailProps } from "./article-rails";
+import { Rail, Contents, CheckedLine, freshnessIsOk, citationOf, type RailProps } from "./article-rails";
 import {
   Breadcrumbs,
   DataTable,
+  DateField,
+  ErrorSummary,
+  FieldError,
   Inset,
   type Option,
   DatedNote,
@@ -29,7 +32,7 @@ import {
   WarningText,
 } from "./components";
 import { Indexed } from "./indexed";
-import { CopyIcon } from "./icons";
+import { CompareIcon, CopyIcon } from "./icons";
 import { Layout, ORIGIN } from "./layout";
 import { articleDescription, articleJsonLd } from "./seo";
 import { LawLink, StatusBadge, VERBS, lawLabelText, lawLabels } from "./shared";
@@ -39,6 +42,7 @@ export interface ArticleContext {
   attribution: boolean;
   highlightLast: boolean;
   filter: string;
+  invalidDate?: string;
 }
 
 const PALETTE = 8;
@@ -266,12 +270,14 @@ export function renderArticle(
     showsText,
   );
   const canonical = `${ORIGIN}${path}`;
+  const invalidDate = ctx.invalidDate;
 
   return (
     <Layout
-      title={title}
+      title={invalidDate === undefined ? title : `${t("errorPrefix")}: ${title}`}
       description={description}
       canonical={canonical}
+      noindex={invalidDate !== undefined || undefined}
       ogType="article"
       jsonLd={articleJsonLd(act, actRef, article, version, canonical)}
       script="/article.js"
@@ -287,6 +293,7 @@ export function renderArticle(
           ]}
           aside={date !== null && <DatedNote date={date} exit={current} />}
         />
+        {invalidDate !== undefined && <ErrorSummary items={[{ href: `#${DATE_ID}`, text: t("dateInvalid") }]} />}
         <div class="head">
           <div>
             {where.length > 0 && <p class="where">{where.map(headingText).join(" › ")}</p>}
@@ -295,27 +302,43 @@ export function renderArticle(
               {article.title && <span class="ttl">{article.title}</span>}
             </h1>
             {showsText && <StatusRow view={view} {...{ act, article, ctx }} />}
+            <CheckedLine act={act} now={ctx.now} />
           </div>
         </div>
         <Notices view={view} {...{ article, date, onDate }} />
-        <FreshnessWarning act={act} />
         {upcoming && (
           <p class="fresh-line next-version">
             <a href={onDate(upcoming.from)}>{t("freshNextVersion", { date: formatRo(upcoming.from) })}</a>
           </p>
         )}
+        {showsText && article.versions.length > 1 && (
+          <AtDate
+            article={article}
+            action={articleUrl(actRef, article)}
+            date={date}
+            invalid={invalidDate}
+            hidden={{ ...flags, ...(ctx.filter === "" ? {} : { cuprins: ctx.filter }) }}
+          />
+        )}
 
         <div class="tools">
           <p class="compare-links">
             {article.versions.length > 1 ? (
-              <a
-                href={compare}
-                aria-label={t(toCurrent === compare ? "compareWithCurrent" : "compareVersions")}
-              >
-                {t(toCurrent === compare ? "compareCurrentShort" : "compareShort")}
-              </a>
+              toCurrent === compare ? (
+                <a href={compare} aria-label={t("compareWithCurrent")}>
+                  {t("compareCurrentShort")}
+                </a>
+              ) : (
+                <a class="icon" href={compare} aria-label={t("compareVersions")} title={t("compareVersions")}>
+                  <CompareIcon />
+                  <span class="vh">{t("compareShort")}</span>
+                </a>
+              )
             ) : (
-              <OffLink>{t("compareShort")}</OffLink>
+              <OffLink class="icon">
+                <CompareIcon />
+                <span class="vh">{t("compareShort")}</span>
+              </OffLink>
             )}
             {toCurrent !== undefined && toCurrent !== compare && (
               <a href={toCurrent} aria-label={t("compareWithCurrent")}>
@@ -352,7 +375,6 @@ export function renderArticle(
               article={article}
               version={version}
               address={`${ORIGIN}${articleUrl(actRef, article, version.from)}`}
-              note={freshnessLine(act)}
             />
           </>
         )}
@@ -384,6 +406,47 @@ export function renderArticle(
         />
       </article>
     </Layout>
+  );
+}
+
+const DATE_ID = "la-data";
+const LISTED_VERSIONS = 8;
+
+function versionList(article: ArticleObject): string {
+  const dates = article.versions.map((v) => formatRo(v.from));
+  return (dates.length > LISTED_VERSIONS ? [dates[0]!, "…", ...dates.slice(-3)] : dates).join(", ");
+}
+
+function AtDate(props: {
+  article: ArticleObject;
+  action: string;
+  date: string | null;
+  invalid: string | undefined;
+  hidden: Record<string, string>;
+}) {
+  const { invalid } = props;
+  return (
+    <details class="at-date" open={invalid !== undefined}>
+      <summary>{t("atDateSummary")}</summary>
+      <form class={invalid === undefined ? "at-date-form" : "at-date-form error"} method="get" action={props.action} novalidate>
+        {Object.entries(props.hidden).map(([name, value]) => (
+          <input type="hidden" name={name} value={value} />
+        ))}
+        <label class="label" for={DATE_ID}>
+          {t("atDateLabel")}
+        </label>
+        {invalid !== undefined && <FieldError id={DATE_ID}>{t("dateInvalid")}</FieldError>}
+        <div class="date-row">
+          <DateField id={DATE_ID} name="data" value={props.date} typed={invalid} invalid={invalid !== undefined} />
+          <button class="btn secondary" type="submit">
+            {t("timeSubmit")}
+          </button>
+        </div>
+        <p class="hint" id={`${DATE_ID}-hint`}>
+          {t("atDateHint", { list: versionList(props.article) })}
+        </p>
+      </form>
+    </details>
   );
 }
 
@@ -430,7 +493,7 @@ function StatusRow(props: { view: View; act: ActObject; article: ArticleObject; 
     <div class="status">
       {badge}
       {validity !== "" && <span>{validity}</span>}
-      {verified && freshnessIsOk(act) && <span class="fact">{t("statusVerified", { date: formatRo(verified) })}</span>}
+      {verified && freshnessIsOk(act, ctx.now) && <span class="fact">{t("statusVerified", { date: formatRo(verified) })}</span>}
     </div>
   );
 }
@@ -512,7 +575,6 @@ function SourceLine(props: {
   article: ArticleObject;
   version: ArticleVersion;
   address: string;
-  note?: Child[] | null;
 }) {
   const { act, article, version } = props;
   let host = act.portal;
@@ -544,7 +606,6 @@ function SourceLine(props: {
           <a href={`${SOURCE_REPOSITORY}/issues/new?${issue.toString()}`}>{t("reportIssue")}</a>
         </span>
       </p>
-      {props.note && <p class="fresh-line">{props.note}</p>}
     </div>
   );
 }
